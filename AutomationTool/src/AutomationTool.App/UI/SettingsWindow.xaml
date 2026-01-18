@@ -1,0 +1,47 @@
+<Window x:Class="AutomationTool.UI.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" 
+        Height="400" Width="450"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,20"/>
+
+            <Label Content="Toggle Hotkey" Foreground="{StaticResource TextSecondaryBrush}"/>
+            <TextBox x:Name="HotkeyBox" Margin="0,0,0,15"/>
+
+            <Label Content="Log Level" Foreground="{StaticResource TextSecondaryBrush}"/>
+            <ComboBox x:Name="LogLevelCombo" Margin="0,0,0,15">
+                <ComboBoxItem Content="Debug"/>
+                <ComboBoxItem Content="Info"/>
+                <ComboBoxItem Content="Warning"/>
+                <ComboBoxItem Content="Error"/>
+            </ComboBox>
+
+            <CheckBox x:Name="MinimizeToTrayCheck" Content="Minimize to system tray on close" Margin="0,0,0,10"/>
+            <CheckBox x:Name="ShowPanelOnStartCheck" Content="Show control panel on startup" Margin="0,0,0,10"/>
+            <CheckBox x:Name="MouseNudgeCheck" Content="Prevent sleep by nudging mouse" Margin="0,0,0,10"/>
+
+            <Separator Margin="0,15"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button Content="Open Config Folder" Style="{StaticResource ModernButton}" Click="OpenConfigFolder_Click" Margin="0,0,10,0"/>
+                <Button Content="Open Logs Folder" Style="{StaticResource ModernButton}" Click="OpenLogsFolder_Click"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Save" Style="{StaticResource ModernButton}" Click="Save_Click" Width="80" Margin="0,0,10,0"/>
+            <Button Content="Cancel" Style="{StaticResource ModernButton}" Click="Cancel_Click" Width="80" Background="{StaticResource CardBrush}"/>
+        </StackPanel>
+    </Grid>
+</Window>

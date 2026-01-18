@@ -6,7 +6,8 @@ A collection of Windows utilities and automation tools.
 
 | Project | Description |
 |---------|-------------|
-| [AllowClicker](AllowClicker/) | Windows tray app that auto-clicks "Allow" buttons in VS Code dialogs using UI Automation |
+| [AutomationTool](AutomationTool/) | **NEW** - Modern WPF rule-based UI automation with scripting support |
+| [AllowClicker](AllowClicker/) | Simple WinForms tray app for auto-clicking VS Code dialogs |
 
 ## Getting Started
 
