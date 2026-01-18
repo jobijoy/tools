@@ -15,30 +15,66 @@ public class ScriptExecutionService : IScriptExecutionService
 {
     private readonly LogService _log;
     private readonly ConfigService _config;
-    private readonly ScriptOptions _csharpOptions;
+    private ScriptOptions? _csharpOptions;
+    private bool _csharpInitialized;
+    private string? _csharpInitError;
     private static readonly string[] _supportedLanguages = ["powershell", "csharp"];
 
     public ScriptExecutionService(LogService log, ConfigService config)
     {
         _log = log;
         _config = config;
+        // Defer C# script options initialization to avoid single-file publish issues
+    }
 
-        // Setup C# scripting options with common imports
-        _csharpOptions = ScriptOptions.Default
-            .AddReferences(
+    /// <summary>
+    /// Lazily initializes C# scripting options. Returns false if initialization fails.
+    /// </summary>
+    private bool EnsureCSharpInitialized()
+    {
+        if (_csharpInitialized) return _csharpOptions != null;
+
+        _csharpInitialized = true;
+        
+        try
+        {
+            // Only add references that have a valid location (not single-file bundled)
+            var assemblies = new[]
+            {
                 typeof(object).Assembly,
                 typeof(Enumerable).Assembly,
                 typeof(System.Net.Http.HttpClient).Assembly,
-                typeof(System.Text.Json.JsonSerializer).Assembly)
-            .AddImports(
-                "System",
-                "System.IO",
-                "System.Linq",
-                "System.Text",
-                "System.Collections.Generic",
-                "System.Threading.Tasks",
-                "System.Net.Http",
-                "System.Text.Json");
+                typeof(System.Text.Json.JsonSerializer).Assembly
+            }.Where(a => !string.IsNullOrEmpty(a.Location)).ToArray();
+
+            if (assemblies.Length == 0)
+            {
+                _csharpInitError = "C# scripting unavailable in single-file mode. Use PowerShell scripts instead.";
+                _log.Warn("Script", _csharpInitError);
+                return false;
+            }
+
+            _csharpOptions = ScriptOptions.Default
+                .AddReferences(assemblies)
+                .AddImports(
+                    "System",
+                    "System.IO",
+                    "System.Linq",
+                    "System.Text",
+                    "System.Collections.Generic",
+                    "System.Threading.Tasks",
+                    "System.Net.Http",
+                    "System.Text.Json");
+
+            _log.Debug("Script", "C# scripting initialized successfully");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _csharpInitError = $"C# scripting initialization failed: {ex.Message}";
+            _log.Warn("Script", _csharpInitError);
+            return false;
+        }
     }
 
     public bool IsScriptingEnabled => _config.GetConfig().Settings.ScriptingEnabled;
@@ -170,6 +206,12 @@ public class ScriptExecutionService : IScriptExecutionService
 
     private async Task<ScriptResult> ExecuteCSharpAsync(string script, ScriptContext? context, int timeoutMs)
     {
+        // Lazy initialization of C# scripting
+        if (!EnsureCSharpInitialized())
+        {
+            return ScriptResult.Failed(_csharpInitError ?? "C# scripting not available");
+        }
+
         using var cts = new CancellationTokenSource(timeoutMs > 0 ? timeoutMs : Timeout.Infinite);
 
         try
@@ -182,7 +224,7 @@ public class ScriptExecutionService : IScriptExecutionService
             };
 
             // Run with timeout using Task.Run + cancellation
-            var task = CSharpScript.EvaluateAsync<object?>(script, _csharpOptions, globals);
+            var task = CSharpScript.EvaluateAsync<object?>(script, _csharpOptions!, globals);
             
             var completedTask = await Task.WhenAny(task, Task.Delay(timeoutMs > 0 ? timeoutMs : Timeout.Infinite, cts.Token));
             

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jobijoy/tools/main/AutomationTool/schema/config-schema.json",
+  "SchemaVersion": 1,
+  "Settings": {
+    "Enabled": false,
+    "PollingIntervalMs": 1000,
+    "StartMinimized": true,
+    "MinimizeToTray": true,
+    "StartWithWindows": false,
+    "ToggleHotkey": "Ctrl+Alt+T",
+    "LogLevel": "Info",
+    "Theme": "Dark",
+    "ShowExecutionCount": true,
+    "EnableScripting": true,
+    "EnablePlugins": false
+  },
+  "Rules": [
+    {
+      "Id": "example-vscode-allow",
+      "Name": "VS Code Allow Button",
+      "Enabled": false,
+      "IsRunning": false,
+      "TargetApp": "Code",
+      "WindowTitle": "",
+      "ElementType": "Button",
+      "MatchText": "Allow",
+      "UseRegex": false,
+      "ExcludeTexts": ["Don't Allow"],
+      "Action": "Click",
+      "CooldownSeconds": 2,
+      "DryRun": true
+    }
+  ]
+}
