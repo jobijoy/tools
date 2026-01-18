@@ -19,4 +19,30 @@ public class GlobalSettings
     public bool GlobalMouseNudge { get; set; }            // Prevent sleep by nudging mouse
     public string LogLevel { get; set; } = "Info";
     public string Theme { get; set; } = "Dark";           // Light or Dark
+    
+    // Scripting
+    public bool ScriptingEnabled { get; set; } = true;    // Enable/disable scripting
+    public int DefaultScriptTimeoutMs { get; set; } = 5000;
+    
+    // Plugins
+    public bool PluginsEnabled { get; set; } = true;      // Enable/disable plugins
+    public string[] DisabledPlugins { get; set; } = [];   // Plugin IDs to disable
+    
+    // Event Timeline
+    public bool TimelineEnabled { get; set; } = true;
+    public int MaxTimelineEvents { get; set; } = 1000;
+    public bool PersistTimeline { get; set; }             // Save to SQLite
+    
+    // Notifications
+    public NotificationDefaults NotificationDefaults { get; set; } = new();
+}
+
+/// <summary>
+/// Default notification settings.
+/// </summary>
+public class NotificationDefaults
+{
+    public bool ToastOnRuleMatch { get; set; }
+    public string? DefaultWebhookUrl { get; set; }
+    public bool IncludeTimestamp { get; set; } = true;
 }

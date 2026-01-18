@@ -1,15 +1,17 @@
 # Automation Tool
 
-A modern, rule-based Windows UI automation utility built with WPF. Define rules to automatically click buttons, send keystrokes, run scripts, or alert you when specific UI elements appear.
+A modern, rule-based Windows UI automation platform built with WPF. Define rules to automatically click buttons, send keystrokes, run scripts, or alert you when specific UI elements appear. Extensible with plugins and scripting support.
 
 ## Features
 
 - **🎯 Rule-Based Automation** - Create flexible rules with conditions and actions
-- **🖱️ UI Automation** - Click buttons, interact with list items, detect text
-- **⌨️ SendKeys** - Send keyboard shortcuts and key sequences
-- **📜 Scripting** - Run PowerShell scripts on rule match
-- **🛡️ Safety Controls** - Cooldowns, time windows, confirmation dialogs, alerts
-- **🌙 Modern Dark UI** - Clean WPF interface with live logs
+- **🖱️ Visual Region Selector** - Draw rectangles on screen to target specific areas
+- **📜 Scripting Engine** - PowerShell and C# (Roslyn) scripting with context variables
+- **🔌 Plugin Architecture** - Extend with custom .NET DLLs or PowerShell scripts
+- **📣 Notification Hooks** - Toast, webhook, or script-based notifications
+- **📊 Event Timeline** - Live tracking of all automation events
+- **🛡️ Safety Controls** - Cooldowns, time windows, dry-run mode, confirmations
+- **🌙 Modern Dark UI** - Clean WPF interface with tabbed panels
 - **🔔 System Tray** - Runs in background with global hotkey toggle
 
 ## Quick Start
@@ -46,9 +48,10 @@ dotnet build AutomationTool.sln -c Release
 |--------|-------------|
 | Click | Click the matched element |
 | SendKeys | Send keyboard input (e.g., `Tab, Enter, Ctrl+A`) |
-| RunScript | Execute PowerShell script |
+| RunScript | Execute PowerShell or C# script |
 | ShowNotification | Display a notification |
 | Alert | Log warning and show alert (no action) |
+| Plugin | Execute a custom plugin |
 
 ### Safety
 | Field | Description |
@@ -56,8 +59,51 @@ dotnet build AutomationTool.sln -c Release
 | Cooldown | Seconds between actions for this rule |
 | Time Window | Only active during hours (e.g., `09:00-17:00`) |
 | Require Focus | Only act when window is focused |
+| Dry Run | Log only, don't execute action |
 | Confirm Before | Show confirmation dialog |
 | Alert If Contains | Alert instead of act if text found nearby |
+
+## Scripting
+
+### PowerShell
+```powershell
+# Available variables: $RuleName, $MatchedText, $WindowTitle, $ProcessName, $TriggerTime
+Write-Output "Rule $RuleName matched: $MatchedText"
+```
+
+### C# (Roslyn)
+```csharp
+// Access context through globals
+Log($"Rule {Context.Rule.Name} triggered");
+return $"Window: {Context.WindowTitle}";
+```
+
+## Plugins
+
+Place plugins in the `Plugins/` folder:
+
+### PowerShell Plugin
+```powershell
+# ID: my-plugin
+# Name: My Plugin
+# Description: Does something cool
+# Version: 1.0.0
+
+# Your script code here
+Write-Output "Plugin executed for rule: $RuleName"
+```
+
+### .NET Plugin
+Implement `IPluginAction` interface and compile as DLL.
+
+## Notification Hooks
+
+Rules can trigger notifications:
+- **Toast** - System tray balloon notification
+- **Webhook** - POST JSON to URL with rule context
+- **Script** - Run custom notification script
+
+Message templates support placeholders: `{RuleName}`, `{MatchedText}`, `{WindowTitle}`, `{ProcessName}`, `{TriggerTime}`, `{Action}`
 
 ## Configuration
 
@@ -71,7 +117,10 @@ Rules are stored in `config.json`:
     "toggleHotkey": "Ctrl+Alt+T",
     "showPanelOnStart": true,
     "minimizeToTray": true,
-    "logLevel": "Info"
+    "logLevel": "Info",
+    "scriptingEnabled": true,
+    "pluginsEnabled": true,
+    "timelineEnabled": true
   },
   "rules": [
     {
@@ -79,7 +128,12 @@ Rules are stored in `config.json`:
       "targetApp": "Code",
       "matchText": "Allow, Continue",
       "action": "Click",
-      "cooldownSeconds": 2
+      "cooldownSeconds": 2,
+      "notification": {
+        "type": "toast",
+        "message": "Clicked {MatchedText} in {WindowTitle}",
+        "onSuccess": true
+      }
     }
   ]
 }
@@ -101,28 +155,70 @@ Rules are stored in `config.json`:
 ```
 AutomationTool/
 ├── Models/
-│   ├── Rule.cs           # Rule definition with all fields
-│   └── AppConfig.cs      # Global settings
+│   ├── Rule.cs              # Rule definition with all fields
+│   └── AppConfig.cs         # Global settings
 ├── Services/
-│   ├── AutomationEngine.cs  # Core rule evaluation loop
-│   ├── ActionExecutor.cs    # Click, SendKeys, RunScript
-│   ├── ConfigService.cs     # JSON config management
-│   ├── LogService.cs        # Logging
-│   ├── TrayService.cs       # System tray & hotkeys
-│   └── Win32.cs             # Native interop
+│   ├── AutomationEngine.cs     # Core rule evaluation loop
+│   ├── ActionExecutor.cs       # Click, SendKeys, RunScript, Plugin
+│   ├── ConfigService.cs        # JSON config management
+│   ├── LogService.cs           # Logging with file output
+│   ├── TrayService.cs          # System tray & hotkeys
+│   ├── ScriptExecutionService.cs # PowerShell & C# scripting
+│   ├── PluginService.cs        # Plugin discovery & execution
+│   ├── NotificationService.cs  # Toast, webhook, script hooks
+│   ├── EventTimelineService.cs # Event tracking
+│   ├── RegionCaptureService.cs # Visual region selection
+│   └── Infrastructure/         # Future extensibility stubs
 └── UI/
-    ├── MainWindow.xaml      # Main control panel
-    ├── RuleEditorWindow.xaml # Rule editor dialog
-    └── SettingsWindow.xaml  # App settings
+    ├── MainWindow.xaml         # Main panel with tabs
+    ├── RuleEditorWindow.xaml   # Rule editor dialog
+    ├── SettingsWindow.xaml     # App settings
+    └── RegionSelectorOverlay.xaml # Screen region picker
 ```
 
-## Roadmap
+## Sample Rules
 
-- [ ] Visual region selector (click+drag)
-- [ ] C# scripting via Roslyn
-- [ ] Action chaining (sequences)
-- [ ] Import/export rules
-- [ ] Webhook support
+### Auto-click VS Code permission dialogs
+```json
+{
+  "name": "VS Code Allow",
+  "targetApp": "Code",
+  "matchText": "Allow",
+  "excludeTexts": ["Continue Chat in"],
+  "action": "Click",
+  "cooldownSeconds": 2
+}
+```
+
+### Log Chrome downloads with script
+```json
+{
+  "name": "Chrome Download Logger",
+  "targetApp": "chrome",
+  "matchText": "Download.*completed",
+  "useRegex": true,
+  "action": "RunScript",
+  "scriptLanguage": "powershell",
+  "script": "Add-Content -Path downloads.log -Value \"$TriggerTime: $MatchedText\""
+}
+```
+
+### Webhook on Slack mention
+```json
+{
+  "name": "Slack Mention Alert",
+  "targetApp": "slack",
+  "matchText": "@channel|@here|@yourname",
+  "useRegex": true,
+  "action": "ShowNotification",
+  "notification": {
+    "type": "webhook",
+    "url": "https://your-webhook-url",
+    "message": "Slack mention: {MatchedText}",
+    "onSuccess": true
+  }
+}
+```
 
 ## License
 

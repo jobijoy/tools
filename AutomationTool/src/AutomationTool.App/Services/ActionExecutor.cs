@@ -1,9 +1,10 @@
 using System.Windows.Automation;
+using AutomationTool.Models;
 
 namespace AutomationTool.Services;
 
 /// <summary>
-/// Executes automation actions (click, sendkeys, script).
+/// Executes automation actions (click, sendkeys, script, plugins).
 /// </summary>
 public class ActionExecutor
 {
@@ -12,6 +13,135 @@ public class ActionExecutor
     public ActionExecutor(LogService log)
     {
         _log = log;
+    }
+
+    /// <summary>
+    /// Execute the action defined in a rule.
+    /// </summary>
+    public async Task<bool> ExecuteRuleActionAsync(Rule rule, AutomationElement element, AutomationContext? context = null)
+    {
+        if (rule.DryRun)
+        {
+            _log.Info("Action", $"[DRY RUN] Would execute '{rule.Action}' for rule '{rule.Name}'");
+            App.Timeline.RecordAction(rule.Id, rule.Name, rule.Action, true, "Dry run - no action taken");
+            return true;
+        }
+
+        context ??= new AutomationContext();
+
+        try
+        {
+            var success = rule.Action.ToLowerInvariant() switch
+            {
+                "click" => ExecuteClick(element),
+                "sendkeys" => ExecuteSendKeys(rule.Keys),
+                "runscript" => await ExecuteScriptAsync(rule, context),
+                "shownotification" => ExecuteShowNotification(rule),
+                "plugin" => await ExecutePluginAsync(rule, context),
+                "alert" => ExecuteAlert(rule),
+                _ => false
+            };
+
+            // Record to timeline
+            App.Timeline.RecordAction(rule.Id, rule.Name, rule.Action, success);
+
+            // Send notification if configured
+            if (rule.Notification != null)
+            {
+                var shouldNotify = (success && rule.Notification.OnSuccess) || (!success && rule.Notification.OnFailure);
+                if (shouldNotify)
+                {
+                    var notifyContext = new NotificationContext
+                    {
+                        Rule = rule,
+                        MatchedText = context.MatchedText,
+                        WindowTitle = context.WindowTitle,
+                        ProcessName = context.ProcessName,
+                        TriggerTime = DateTime.Now,
+                        ActionTaken = rule.Action
+                    };
+
+                    var sent = await App.Notifications.SendAsync(rule.Notification, notifyContext);
+                    App.Timeline.RecordNotification(rule.Id, rule.Name, rule.Notification.Type ?? "unknown", sent);
+                }
+            }
+
+            return success;
+        }
+        catch (Exception ex)
+        {
+            _log.Error("Action", $"Action execution failed: {ex.Message}");
+            App.Timeline.RecordAction(rule.Id, rule.Name, rule.Action, false, ex.Message);
+            return false;
+        }
+    }
+
+    private bool ExecuteClick(AutomationElement element)
+    {
+        ClickElement(element);
+        return true;
+    }
+
+    private bool ExecuteSendKeys(string? keys)
+    {
+        if (string.IsNullOrEmpty(keys)) return false;
+        SendKeys(keys);
+        return true;
+    }
+
+    private async Task<bool> ExecuteScriptAsync(Rule rule, AutomationContext context)
+    {
+        if (string.IsNullOrEmpty(rule.Script))
+        {
+            _log.Warn("Action", "Script is empty");
+            return false;
+        }
+
+        var scriptContext = new ScriptContext
+        {
+            Rule = rule,
+            MatchedText = context.MatchedText,
+            WindowTitle = context.WindowTitle,
+            ProcessName = context.ProcessName,
+            WindowHandle = context.WindowHandle,
+            TriggerTime = DateTime.Now
+        };
+
+        var result = await App.Scripts.ExecuteAsync(rule.ScriptLanguage, rule.Script, scriptContext);
+
+        if (!string.IsNullOrEmpty(result.Output))
+            _log.Debug("Script", $"Output: {result.Output}");
+
+        App.Timeline.RecordScript(rule.Id, rule.Name, rule.ScriptLanguage, result.Success, result.Output);
+        return result.Success;
+    }
+
+    private bool ExecuteShowNotification(Rule rule)
+    {
+        var message = rule.NotificationMessage ?? $"Rule '{rule.Name}' triggered";
+        App.Notifications.ShowToast("Automation Tool", message);
+        return true;
+    }
+
+    private async Task<bool> ExecutePluginAsync(Rule rule, AutomationContext context)
+    {
+        if (string.IsNullOrEmpty(rule.PluginId))
+        {
+            _log.Warn("Action", "Plugin ID is empty");
+            return false;
+        }
+
+        var success = await App.Plugins.ExecuteAsync(rule.PluginId, rule, context);
+        App.Timeline.RecordPlugin(rule.Id, rule.Name, rule.PluginId, success);
+        return success;
+    }
+
+    private bool ExecuteAlert(Rule rule)
+    {
+        var message = rule.NotificationMessage ?? $"Alert: Rule '{rule.Name}' triggered";
+        System.Windows.MessageBox.Show(message, "Automation Alert", 
+            System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+        return true;
     }
 
     public void ClickElement(AutomationElement element)

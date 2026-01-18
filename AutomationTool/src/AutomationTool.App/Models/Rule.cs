@@ -23,11 +23,15 @@ public class Rule
     public ScreenRegion? Region { get; set; }             // Normalized screen region (0-1)
 
     // === Action ===
-    public string Action { get; set; } = "Click";         // Click, SendKeys, RunScript, ShowNotification, Alert
+    public string Action { get; set; } = "Click";         // Click, SendKeys, RunScript, ShowNotification, Alert, Plugin
     public string? Keys { get; set; }                     // For SendKeys action
-    public string? Script { get; set; }                   // Inline script content
+    public string? Script { get; set; }                   // Inline script content or file path
     public string ScriptLanguage { get; set; } = "powershell"; // powershell, csharp
     public string? NotificationMessage { get; set; }      // For ShowNotification
+    public string? PluginId { get; set; }                 // For Plugin action
+
+    // === Notification Hooks ===
+    public NotificationConfig? Notification { get; set; } // Optional notification routing
 
     // === Safety & Timing ===
     public int CooldownSeconds { get; set; } = 2;         // Min seconds between actions
@@ -35,6 +39,7 @@ public class Rule
     public bool RequireFocus { get; set; }                // Only act if window is focused
     public bool ConfirmBeforeAction { get; set; }         // Show confirmation dialog
     public string[] AlertIfContains { get; set; } = [];   // Alert instead of act if text found nearby
+    public bool DryRun { get; set; }                      // Log but don't execute action
 
     // === Metadata ===
     public DateTime? LastTriggered { get; set; }
@@ -52,4 +57,20 @@ public class ScreenRegion
     public double Height { get; set; } = 1.0;
 
     public override string ToString() => $"({X:P0}, {Y:P0}) {Width:P0}x{Height:P0}";
+}
+
+/// <summary>
+/// Configuration for notification routing.
+/// </summary>
+public class NotificationConfig
+{
+    public string Type { get; set; } = "toast";           // toast, webhook, script
+    public string? Title { get; set; }                    // For toast
+    public string? Message { get; set; }                  // Message template with placeholders
+    public string? Url { get; set; }                      // For webhook
+    public string? ScriptPath { get; set; }               // For script hook
+    public string? ScriptLanguage { get; set; } = "powershell";
+    public int TimeoutMs { get; set; } = 5000;            // Script timeout
+    public bool OnSuccess { get; set; } = true;           // Send on successful action
+    public bool OnFailure { get; set; }                   // Send on failed action
 }

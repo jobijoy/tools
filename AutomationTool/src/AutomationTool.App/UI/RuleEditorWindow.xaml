@@ -98,6 +98,7 @@
                             <ComboBoxItem Content="RunScript"/>
                             <ComboBoxItem Content="ShowNotification"/>
                             <ComboBoxItem Content="Alert"/>
+                            <ComboBoxItem Content="Plugin"/>
                         </ComboBox>
 
                         <!-- SendKeys Options -->
@@ -113,14 +114,69 @@
                                 <ComboBoxItem Content="powershell" IsSelected="True"/>
                                 <ComboBoxItem Content="csharp"/>
                             </ComboBox>
-                            <Label Content="Script Code" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <Label Content="Script Code (or file path)" Foreground="{StaticResource TextSecondaryBrush}"/>
                             <TextBox x:Name="ScriptBox" AcceptsReturn="True" Height="100" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,0,0,10"/>
+                            <Button Content="📂 Browse..." Style="{StaticResource ModernButton}" Click="BrowseScript_Click" HorizontalAlignment="Left" Margin="0,0,0,10"/>
                         </StackPanel>
 
                         <!-- Notification Options -->
                         <StackPanel x:Name="NotificationPanel" Visibility="Collapsed">
                             <Label Content="Notification Message" Foreground="{StaticResource TextSecondaryBrush}"/>
                             <TextBox x:Name="NotificationBox" Margin="0,0,0,10"/>
+                        </StackPanel>
+
+                        <!-- Plugin Options -->
+                        <StackPanel x:Name="PluginPanel" Visibility="Collapsed">
+                            <Label Content="Plugin" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <ComboBox x:Name="PluginCombo" Margin="0,0,0,10" DisplayMemberPath="Name" SelectedValuePath="Id"/>
+                            <TextBlock x:Name="PluginDescriptionText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="11"/>
+                        </StackPanel>
+
+                        <CheckBox x:Name="DryRunCheck" Content="Dry Run (log only, no action)" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Notification Hooks Section -->
+                <Expander Header="📣 Notification Hooks" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                    <StackPanel Margin="10,10,0,0">
+                        <CheckBox x:Name="EnableNotificationCheck" Content="Enable notification on trigger" Margin="0,0,0,10" Checked="EnableNotification_Changed" Unchecked="EnableNotification_Changed"/>
+                        
+                        <StackPanel x:Name="NotificationHookPanel" Visibility="Collapsed">
+                            <Label Content="Notification Type" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <ComboBox x:Name="NotificationTypeCombo" Margin="0,0,0,10" SelectionChanged="NotificationType_Changed">
+                                <ComboBoxItem Content="toast" IsSelected="True"/>
+                                <ComboBoxItem Content="webhook"/>
+                                <ComboBoxItem Content="script"/>
+                            </ComboBox>
+
+                            <Label Content="Message Template" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBox x:Name="NotificationMessageBox" Text="Rule '{RuleName}' triggered: {MatchedText}" Margin="0,0,0,5"/>
+                            <TextBlock Text="Placeholders: {RuleName}, {MatchedText}, {WindowTitle}, {ProcessName}, {TriggerTime}, {Action}" 
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" Margin="0,0,0,10"/>
+
+                            <!-- Webhook Options -->
+                            <StackPanel x:Name="WebhookOptionsPanel" Visibility="Collapsed">
+                                <Label Content="Webhook URL" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBox x:Name="WebhookUrlBox" Margin="0,0,0,10"/>
+                            </StackPanel>
+
+                            <!-- Script Hook Options -->
+                            <StackPanel x:Name="ScriptHookOptionsPanel" Visibility="Collapsed">
+                                <Label Content="Script Path" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="NotificationScriptPathBox" Grid.Column="0" Margin="0,0,8,0"/>
+                                    <Button Content="📂" Grid.Column="1" Style="{StaticResource ModernButton}" Click="BrowseNotificationScript_Click"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <CheckBox x:Name="NotifyOnSuccessCheck" Content="On Success" IsChecked="True" Margin="0,0,15,0"/>
+                                <CheckBox x:Name="NotifyOnFailureCheck" Content="On Failure"/>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
                 </Expander>

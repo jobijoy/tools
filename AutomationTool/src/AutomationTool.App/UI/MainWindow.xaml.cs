@@ -19,6 +19,8 @@ public partial class MainWindow : Window
         LoadRules();
         SubscribeToLog();
         SetupStatusTimer();
+        SetupTimeline();
+        LoadPlugins();
         LoadSettings();
 
         // Register hotkey
@@ -49,6 +51,17 @@ public partial class MainWindow : Window
         RulesListView.ItemsSource = null;
         RulesListView.ItemsSource = cfg.Rules;
         UpdateStatus();
+    }
+
+    private void LoadPlugins()
+    {
+        PluginsListView.ItemsSource = null;
+        PluginsListView.ItemsSource = App.Plugins.Plugins;
+    }
+
+    private void SetupTimeline()
+    {
+        TimelineListView.ItemsSource = App.Timeline.Events;
     }
 
     private void SubscribeToLog()
@@ -270,6 +283,51 @@ public partial class MainWindow : Window
             Hide();
             App.Tray.ShowBalloon("Automation Tool", "Running in system tray. Press " + cfg.Settings.ToggleHotkey + " to toggle.");
         }
+    }
+
+    // === Timeline Event Handlers ===
+
+    private void TimelineFilter_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        // Timeline filtering is handled by the ObservableCollection
+        // For now, just refresh the view
+    }
+
+    private void ClearTimeline_Click(object sender, RoutedEventArgs e)
+    {
+        App.Timeline.Clear();
+    }
+
+    // === Plugin Event Handlers ===
+
+    private void RefreshPlugins_Click(object sender, RoutedEventArgs e)
+    {
+        var pluginsPath = Path.Combine(AppContext.BaseDirectory, "Plugins");
+        App.Plugins.UnloadAll();
+        App.Plugins.LoadPlugins(pluginsPath);
+        LoadPlugins();
+        App.Log.Info("Plugins", "Plugins reloaded");
+    }
+
+    private void OpenPluginsFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var pluginsPath = Path.Combine(AppContext.BaseDirectory, "Plugins");
+        if (!Directory.Exists(pluginsPath))
+            Directory.CreateDirectory(pluginsPath);
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(pluginsPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open plugins folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void PluginEnabled_Changed(object sender, RoutedEventArgs e)
+    {
+        // Plugin enable/disable is handled by the binding
     }
 
     public void SetEnabled(bool enabled)

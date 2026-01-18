@@ -107,40 +107,148 @@
         <!-- Splitter -->
         <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" Background="{StaticResource SurfaceBrush}"/>
 
-        <!-- Log Panel -->
+        <!-- Log & Timeline Panel -->
         <Border Grid.Row="3" Margin="16,8,16,16" Background="{StaticResource SurfaceBrush}" CornerRadius="8">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- Log Header -->
-                <Border Grid.Row="0" Background="{StaticResource CardBrush}" CornerRadius="8,8,0,0" Padding="12,8">
+            <TabControl x:Name="BottomTabs" Background="Transparent" BorderThickness="0">
+                <TabControl.Resources>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                        <Setter Property="Background" Value="{StaticResource CardBrush}"/>
+                        <Setter Property="Padding" Value="12,6"/>
+                    </Style>
+                </TabControl.Resources>
+                
+                <!-- Log Tab -->
+                <TabItem Header="📋 Log Output">
                     <Grid>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Log Output" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="LogLevelCombo" Width="80" Margin="20,0,0,0" SelectionChanged="LogLevel_Changed">
-                                <ComboBoxItem Content="Debug"/>
-                                <ComboBoxItem Content="Info" IsSelected="True"/>
-                                <ComboBoxItem Content="Warning"/>
-                                <ComboBoxItem Content="Error"/>
-                            </ComboBox>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="Clear" Style="{StaticResource ModernButton}" Click="ClearLog_Click" Margin="0,0,8,0"/>
-                            <Button Content="Open Log File" Style="{StaticResource ModernButton}" Click="OpenLogFile_Click"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
-                <!-- Log List -->
-                <ListBox x:Name="LogListBox" Grid.Row="1" BorderThickness="0" 
-                         Background="{StaticResource SurfaceBrush}" 
-                         Foreground="{StaticResource TextBrush}"
-                         FontFamily="Consolas" FontSize="11"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-            </Grid>
+                        <!-- Log Header -->
+                        <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="12,8">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox x:Name="LogLevelCombo" Width="80" SelectionChanged="LogLevel_Changed">
+                                        <ComboBoxItem Content="Debug"/>
+                                        <ComboBoxItem Content="Info" IsSelected="True"/>
+                                        <ComboBoxItem Content="Warning"/>
+                                        <ComboBoxItem Content="Error"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Clear" Style="{StaticResource ModernButton}" Click="ClearLog_Click" Margin="0,0,8,0"/>
+                                    <Button Content="Open Log File" Style="{StaticResource ModernButton}" Click="OpenLogFile_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Log List -->
+                        <ListBox x:Name="LogListBox" Grid.Row="1" BorderThickness="0" 
+                                 Background="{StaticResource SurfaceBrush}" 
+                                 Foreground="{StaticResource TextBrush}"
+                                 FontFamily="Consolas" FontSize="11"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                    </Grid>
+                </TabItem>
+                
+                <!-- Timeline Tab -->
+                <TabItem Header="📊 Event Timeline">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Timeline Header -->
+                        <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="12,8">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox x:Name="TimelineFilterCombo" Width="120" SelectionChanged="TimelineFilter_Changed">
+                                        <ComboBoxItem Content="All Events" IsSelected="True" Tag=""/>
+                                        <ComboBoxItem Content="Rule Matches" Tag="RuleMatch"/>
+                                        <ComboBoxItem Content="Actions" Tag="Action"/>
+                                        <ComboBoxItem Content="Notifications" Tag="Notification"/>
+                                        <ComboBoxItem Content="Scripts" Tag="Script"/>
+                                        <ComboBoxItem Content="Plugins" Tag="Plugin"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Clear" Style="{StaticResource ModernButton}" Click="ClearTimeline_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Timeline List -->
+                        <ListView x:Name="TimelineListView" Grid.Row="1" BorderThickness="0"
+                                  Background="{StaticResource SurfaceBrush}">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="" Width="30">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Icon}" FontSize="14"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Time" Width="80">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Rule" Width="120" DisplayMemberBinding="{Binding RuleName}"/>
+                                    <GridViewColumn Header="Event" Width="350" DisplayMemberBinding="{Binding Message}"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Grid>
+                </TabItem>
+                
+                <!-- Plugins Tab -->
+                <TabItem Header="🔌 Plugins">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Plugins Header -->
+                        <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="12,8">
+                            <Grid>
+                                <TextBlock Text="Installed Plugins" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="⟳ Refresh" Style="{StaticResource ModernButton}" Click="RefreshPlugins_Click" Margin="0,0,8,0"/>
+                                    <Button Content="📂 Open Folder" Style="{StaticResource ModernButton}" Click="OpenPluginsFolder_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Plugins List -->
+                        <ListView x:Name="PluginsListView" Grid.Row="1" BorderThickness="0"
+                                  Background="{StaticResource SurfaceBrush}">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="✓" Width="40">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding Enabled}" Checked="PluginEnabled_Changed" Unchecked="PluginEnabled_Changed"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Name" Width="150" DisplayMemberBinding="{Binding Name}"/>
+                                    <GridViewColumn Header="ID" Width="120" DisplayMemberBinding="{Binding Id}"/>
+                                    <GridViewColumn Header="Type" Width="80" DisplayMemberBinding="{Binding Type}"/>
+                                    <GridViewColumn Header="Version" Width="80" DisplayMemberBinding="{Binding Version}"/>
+                                    <GridViewColumn Header="Description" Width="250" DisplayMemberBinding="{Binding Description}"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Grid>
+                </TabItem>
+            </TabControl>
         </Border>
     </Grid>
 </Window>
