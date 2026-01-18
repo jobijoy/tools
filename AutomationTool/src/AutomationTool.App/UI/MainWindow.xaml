@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Automation Tool" 
+        Title="Automation Tool v1.0.0" 
         Height="700" Width="1000"
         MinHeight="500" MinWidth="700"
         Background="{StaticResource BackgroundBrush}"
@@ -17,6 +17,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="200"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header / Status Bar -->
@@ -37,9 +38,11 @@
 
                 <!-- Toggle + Settings -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
-                    <CheckBox x:Name="EnabledCheckBox" Content="Automation Enabled" VerticalAlignment="Center" Margin="0,0,20,0" Checked="EnabledCheckBox_Changed" Unchecked="EnabledCheckBox_Changed"/>
+                    <CheckBox x:Name="EnabledCheckBox" Content="Automation Enabled" VerticalAlignment="Center" Margin="0,0,20,0" 
+                              ToolTip="Toggle automation on/off (Ctrl+Alt+T)" 
+                              Checked="EnabledCheckBox_Changed" Unchecked="EnabledCheckBox_Changed"/>
                     
-                    <ComboBox x:Name="IntervalCombo" Width="100" Margin="0,0,10,0" SelectionChanged="IntervalCombo_Changed">
+                    <ComboBox x:Name="IntervalCombo" Width="100" Margin="0,0,10,0" ToolTip="Polling interval for UI scanning" SelectionChanged="IntervalCombo_Changed">
                         <ComboBoxItem Content="1 sec" Tag="1000"/>
                         <ComboBoxItem Content="3 sec" Tag="3000" IsSelected="True"/>
                         <ComboBoxItem Content="5 sec" Tag="5000"/>
@@ -47,8 +50,8 @@
                         <ComboBoxItem Content="30 sec" Tag="30000"/>
                     </ComboBox>
                     
-                    <Button Content="⚙ Settings" Style="{StaticResource ModernButton}" Click="Settings_Click" Margin="0,0,10,0"/>
-                    <Button Content="✕ Exit" Style="{StaticResource DangerButton}" Click="Exit_Click"/>
+                    <Button Content="⚙  Settings" Style="{StaticResource ModernButton}" Click="Settings_Click" Margin="0,0,10,0" ToolTip="Open application settings"/>
+                    <Button Content="✕  Exit" Style="{StaticResource DangerButton}" Click="Exit_Click" ToolTip="Exit application"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -66,10 +69,10 @@
                     <Grid>
                         <TextBlock Text="Automation Rules" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="+ Add Rule" Style="{StaticResource ModernButton}" Click="AddRule_Click" Margin="0,0,8,0"/>
-                            <Button Content="✎ Edit" Style="{StaticResource ModernButton}" Click="EditRule_Click" Margin="0,0,8,0"/>
-                            <Button Content="🗑 Delete" Style="{StaticResource DangerButton}" Click="DeleteRule_Click" Margin="0,0,8,0"/>
-                            <Button Content="⟳ Reload" Style="{StaticResource ModernButton}" Click="ReloadConfig_Click"/>
+                            <Button Content="＋ Add Rule" Style="{StaticResource PrimaryButton}" Click="AddRule_Click" Margin="0,0,8,0" ToolTip="Create a new automation rule"/>
+                            <Button Content="✎  Edit" Style="{StaticResource ModernButton}" Click="EditRule_Click" Margin="0,0,8,0" ToolTip="Edit selected rule"/>
+                            <Button Content="🗑  Delete" Style="{StaticResource DangerButton}" Click="DeleteRule_Click" Margin="0,0,8,0" ToolTip="Delete selected rule"/>
+                            <Button Content="↻  Reload" Style="{StaticResource ModernButton}" Click="ReloadConfig_Click" ToolTip="Reload config.json from disk"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -109,17 +112,16 @@
 
         <!-- Log & Timeline Panel -->
         <Border Grid.Row="3" Margin="16,8,16,16" Background="{StaticResource SurfaceBrush}" CornerRadius="8">
+            <!-- Version Footer -->
+            <Border.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="About AutomationTool v1.0.0"/>
+                </ContextMenu>
+            </Border.ContextMenu>
             <TabControl x:Name="BottomTabs" Background="Transparent" BorderThickness="0">
-                <TabControl.Resources>
-                    <Style TargetType="TabItem">
-                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                        <Setter Property="Background" Value="{StaticResource CardBrush}"/>
-                        <Setter Property="Padding" Value="12,6"/>
-                    </Style>
-                </TabControl.Resources>
                 
                 <!-- Log Tab -->
-                <TabItem Header="📋 Log Output">
+                <TabItem Header="📋 Log">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -154,7 +156,7 @@
                 </TabItem>
                 
                 <!-- Timeline Tab -->
-                <TabItem Header="📊 Event Timeline">
+                <TabItem Header="📊 Timeline">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -249,6 +251,22 @@
                     </Grid>
                 </TabItem>
             </TabControl>
+        </Border>
+
+        <!-- Version Footer -->
+        <Border Grid.Row="4" Background="{StaticResource SurfaceBrush}" Padding="16,6">
+            <Grid>
+                <TextBlock Text="Ctrl+Alt+T to toggle automation" 
+                           Foreground="{StaticResource TextSecondaryBrush}" 
+                           FontSize="11" 
+                           VerticalAlignment="Center"/>
+                <TextBlock Text="v1.0.0" 
+                           Foreground="{StaticResource TextSecondaryBrush}" 
+                           FontSize="11" 
+                           HorizontalAlignment="Right" 
+                           VerticalAlignment="Center"
+                           ToolTip="AutomationTool v1.0.0 | github.com/jobijoy/tools"/>
+            </Grid>
         </Border>
     </Grid>
 </Window>
