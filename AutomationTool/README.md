@@ -1,8 +1,14 @@
-# AutomationTool
+# IdolClick
+
+> **IdolClick** – Smart Windows UI automation from your system tray
 
 Rule-based Windows UI automation. Auto-click buttons, send keys, run scripts when specific UI elements appear.
 
 ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4) ![License](https://img.shields.io/badge/License-MIT-green)
+
+<p align="center">
+  <img src="src/IdolClick.App/Assets/idol-click.png" alt="IdolClick" width="150"/>
+</p>
 
 ## Features
 
@@ -14,6 +20,12 @@ Rule-based Windows UI automation. Auto-click buttons, send keys, run scripts whe
 | Plugins | Extend with .NET DLLs or PowerShell scripts |
 | Notifications | Toast, webhook, or script hooks |
 | Safety | Cooldowns, time windows, dry-run, confirmations |
+| Single Instance | Only one instance runs at a time |
+
+## Preview
+
+<!-- Add screenshots here -->
+*Coming soon: Main window, tray icon, and rule editor screenshots*
 
 ## Quick Start
 
@@ -21,7 +33,7 @@ Rule-based Windows UI automation. Auto-click buttons, send keys, run scripts whe
 # Clone and run
 git clone https://github.com/jobijoy/tools.git
 cd tools/AutomationTool
-.\Start-AutomationTool.ps1
+.\Start-IdolClick.ps1
 ```
 
 **Requirements:** Windows 10/11, [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -81,15 +93,25 @@ Log($"Rule {Context.Rule.Name} triggered");
 
 ## Plugins
 
-Drop `.ps1` or `.dll` files in `Plugins/` folder. See [Plugins/README.md](src/AutomationTool.App/Plugins/README.md).
+Drop `.ps1` or `.dll` files in `Plugins/` folder. See [Plugins/README.md](src/IdolClick.App/Plugins/README.md).
 
 ## Build
 
 ```powershell
-dotnet build AutomationTool.sln -c Release
+dotnet build IdolClick.sln -c Release
 ```
 
-Output: `src/AutomationTool.App/bin/Release/net8.0-windows/AutomationTool.exe`
+Output: `src/IdolClick.App/bin/Release/net8.0-windows/IdolClick.exe`
+
+### Publish (Self-contained)
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained false
+```
+
+## Security & Privacy
+
+> 🔐 **All UI actions are performed locally.** No data is sent externally. Rules only interact with windows you target. The application requires no network access and stores all configuration locally.
 
 ## License
 

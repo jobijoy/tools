@@ -1,0 +1,89 @@
+<Window x:Class="IdolClick.UI.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Idol Click"
+        Height="400" Width="400"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False">
+    
+    <Grid>
+        <!-- Shadow effect -->
+        <Border CornerRadius="24" Margin="20">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.5" Color="Black"/>
+            </Border.Effect>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#1a1a2e" Offset="0"/>
+                    <GradientStop Color="#16213e" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="40"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Logo Image -->
+                <Image Grid.Row="0" 
+                       Source="/Assets/idol-click.png" 
+                       Width="200" Height="200"
+                       Margin="0,30,0,0"
+                       RenderOptions.BitmapScalingMode="HighQuality">
+                    <Image.Effect>
+                        <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.6" Color="#00a8ff"/>
+                    </Image.Effect>
+                </Image>
+                
+                <!-- App Name -->
+                <TextBlock Grid.Row="1" 
+                           Text="Idol Click" 
+                           FontSize="28" 
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           Margin="0,10,0,5"/>
+                
+                <!-- Loading indicator -->
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,10,0,0">
+                    <TextBlock x:Name="StatusText" 
+                               Text="Initializing..." 
+                               FontSize="12" 
+                               Foreground="#a0a0a0"
+                               HorizontalAlignment="Center"/>
+                    
+                    <!-- Progress bar -->
+                    <Border Margin="0,12,0,0" Width="200" Height="3" CornerRadius="2" Background="#2a2a3e">
+                        <Border x:Name="ProgressBar" 
+                                HorizontalAlignment="Left" 
+                                Width="0" 
+                                CornerRadius="2">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#0078D4" Offset="0"/>
+                                    <GradientStop Color="#00a8ff" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                    </Border>
+                </StackPanel>
+                
+                <!-- Version -->
+                <TextBlock Grid.Row="3" 
+                           Text="v1.0.0" 
+                           FontSize="11" 
+                           Foreground="#606060"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

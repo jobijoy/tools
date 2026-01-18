@@ -1,0 +1,209 @@
+<Window x:Class="IdolClick.UI.RuleEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rule Editor" 
+        Height="700" Width="600"
+        MinHeight="600" MinWidth="500"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Basic Info -->
+                <TextBlock Text="Basic Info" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,10"/>
+                
+                <Label Content="Rule Name" Foreground="{StaticResource TextSecondaryBrush}"/>
+                <TextBox x:Name="NameBox" Margin="0,0,0,15"/>
+
+                <!-- Target Section -->
+                <Expander Header="🎯 Target" IsExpanded="True" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                    <StackPanel Margin="10,10,0,0">
+                        <Label Content="Target Application (process name, comma-separated)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="TargetAppBox" Margin="0,0,0,10"/>
+
+                        <Label Content="Window Title Contains (optional)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="WindowTitleBox" Margin="0,0,0,10"/>
+
+                        <Label Content="Element Type" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <ComboBox x:Name="ElementTypeCombo" Margin="0,0,0,10">
+                            <ComboBoxItem Content="Button" IsSelected="True"/>
+                            <ComboBoxItem Content="ListItem"/>
+                            <ComboBoxItem Content="Text"/>
+                            <ComboBoxItem Content="Link"/>
+                            <ComboBoxItem Content="Any"/>
+                        </ComboBox>
+
+                        <Label Content="Match Text (comma-separated patterns)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="MatchTextBox" Margin="0,0,0,10"/>
+
+                        <CheckBox x:Name="UseRegexCheck" Content="Use Regular Expression" Margin="0,0,0,10"/>
+
+                        <Label Content="Exclude Text (comma-separated, optional)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="ExcludeTextBox" Margin="0,0,0,10"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Region Section -->
+                <Expander Header="📐 Screen Region (Optional)" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                    <StackPanel Margin="10,10,0,0">
+                        <TextBlock Text="Normalized coordinates (0.0 to 1.0 relative to window)" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
+                        
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Column="0" Grid.Row="0">
+                                <Label Content="X" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBox x:Name="RegionXBox" Text="0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Grid.Row="0">
+                                <Label Content="Y" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBox x:Name="RegionYBox" Text="0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,10,0,0">
+                                <Label Content="Width" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBox x:Name="RegionWidthBox" Text="1"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Grid.Row="1" Margin="0,10,0,0">
+                                <Label Content="Height" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBox x:Name="RegionHeightBox" Text="1"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Content="🖱 Select Region on Screen..." Style="{StaticResource ModernButton}" Click="SelectRegion_Click" Margin="0,15,0,0" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Action Section -->
+                <Expander Header="⚡ Action" IsExpanded="True" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                    <StackPanel Margin="10,10,0,0">
+                        <Label Content="Action Type" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <ComboBox x:Name="ActionCombo" SelectionChanged="ActionCombo_Changed" Margin="0,0,0,10">
+                            <ComboBoxItem Content="Click" IsSelected="True"/>
+                            <ComboBoxItem Content="SendKeys"/>
+                            <ComboBoxItem Content="RunScript"/>
+                            <ComboBoxItem Content="ShowNotification"/>
+                            <ComboBoxItem Content="Alert"/>
+                            <ComboBoxItem Content="Plugin"/>
+                        </ComboBox>
+
+                        <!-- SendKeys Options -->
+                        <StackPanel x:Name="SendKeysPanel" Visibility="Collapsed">
+                            <Label Content="Keys to Send (e.g., Tab, Enter, Ctrl+A)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBox x:Name="KeysBox" Margin="0,0,0,10"/>
+                        </StackPanel>
+
+                        <!-- Script Options -->
+                        <StackPanel x:Name="ScriptPanel" Visibility="Collapsed">
+                            <Label Content="Script Language" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <ComboBox x:Name="ScriptLangCombo" Margin="0,0,0,10">
+                                <ComboBoxItem Content="powershell" IsSelected="True"/>
+                                <ComboBoxItem Content="csharp"/>
+                            </ComboBox>
+                            <Label Content="Script Code (or file path)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBox x:Name="ScriptBox" AcceptsReturn="True" Height="100" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,0,0,10"/>
+                            <Button Content="📂 Browse..." Style="{StaticResource ModernButton}" Click="BrowseScript_Click" HorizontalAlignment="Left" Margin="0,0,0,10"/>
+                        </StackPanel>
+
+                        <!-- Notification Options -->
+                        <StackPanel x:Name="NotificationPanel" Visibility="Collapsed">
+                            <Label Content="Notification Message" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBox x:Name="NotificationBox" Margin="0,0,0,10"/>
+                        </StackPanel>
+
+                        <!-- Plugin Options -->
+                        <StackPanel x:Name="PluginPanel" Visibility="Collapsed">
+                            <Label Content="Plugin" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <ComboBox x:Name="PluginCombo" Margin="0,0,0,10" DisplayMemberPath="Name" SelectedValuePath="Id"/>
+                            <TextBlock x:Name="PluginDescriptionText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="11"/>
+                        </StackPanel>
+
+                        <CheckBox x:Name="DryRunCheck" Content="Dry Run (log only, no action)" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Notification Hooks Section -->
+                <Expander Header="📣 Notification Hooks" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                    <StackPanel Margin="10,10,0,0">
+                        <CheckBox x:Name="EnableNotificationCheck" Content="Enable notification on trigger" Margin="0,0,0,10" Checked="EnableNotification_Changed" Unchecked="EnableNotification_Changed"/>
+                        
+                        <StackPanel x:Name="NotificationHookPanel" Visibility="Collapsed">
+                            <Label Content="Notification Type" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <ComboBox x:Name="NotificationTypeCombo" Margin="0,0,0,10" SelectionChanged="NotificationType_Changed">
+                                <ComboBoxItem Content="toast" IsSelected="True"/>
+                                <ComboBoxItem Content="webhook"/>
+                                <ComboBoxItem Content="script"/>
+                            </ComboBox>
+
+                            <Label Content="Message Template" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBox x:Name="NotificationMessageBox" Text="Rule '{RuleName}' triggered: {MatchedText}" Margin="0,0,0,5"/>
+                            <TextBlock Text="Placeholders: {RuleName}, {MatchedText}, {WindowTitle}, {ProcessName}, {TriggerTime}, {Action}" 
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" Margin="0,0,0,10"/>
+
+                            <!-- Webhook Options -->
+                            <StackPanel x:Name="WebhookOptionsPanel" Visibility="Collapsed">
+                                <Label Content="Webhook URL" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBox x:Name="WebhookUrlBox" Margin="0,0,0,10"/>
+                            </StackPanel>
+
+                            <!-- Script Hook Options -->
+                            <StackPanel x:Name="ScriptHookOptionsPanel" Visibility="Collapsed">
+                                <Label Content="Script Path" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="NotificationScriptPathBox" Grid.Column="0" Margin="0,0,8,0"/>
+                                    <Button Content="📂" Grid.Column="1" Style="{StaticResource ModernButton}" Click="BrowseNotificationScript_Click"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <CheckBox x:Name="NotifyOnSuccessCheck" Content="On Success" IsChecked="True" Margin="0,0,15,0"/>
+                                <CheckBox x:Name="NotifyOnFailureCheck" Content="On Failure"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Safety Section -->
+                <Expander Header="🛡 Safety &amp; Timing" IsExpanded="True" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10">
+                    <StackPanel Margin="10,10,0,0">
+                        <Label Content="Cooldown (seconds between actions)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="CooldownBox" Text="2" Margin="0,0,0,10" Width="80" HorizontalAlignment="Left"/>
+
+                        <Label Content="Time Window (e.g., 09:00-17:00, optional)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="TimeWindowBox" Margin="0,0,0,10" Width="150" HorizontalAlignment="Left"/>
+
+                        <CheckBox x:Name="RequireFocusCheck" Content="Only act when window is focused" Margin="0,0,0,10"/>
+                        <CheckBox x:Name="ConfirmCheck" Content="Show confirmation dialog before action" Margin="0,0,0,10"/>
+
+                        <Label Content="Alert if nearby text contains (comma-separated)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="AlertIfBox" Margin="0,0,0,10"/>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Save" Style="{StaticResource ModernButton}" Click="Save_Click" Width="100" Margin="0,0,10,0"/>
+            <Button Content="Cancel" Style="{StaticResource ModernButton}" Click="Cancel_Click" Width="100" Background="{StaticResource CardBrush}"/>
+        </StackPanel>
+    </Grid>
+</Window>
