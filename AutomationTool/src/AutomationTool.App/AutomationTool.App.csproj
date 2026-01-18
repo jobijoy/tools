@@ -9,6 +9,10 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>AutomationTool</AssemblyName>
     <RootNamespace>AutomationTool</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>AutomationTool Contributors</Authors>
+    <Description>Rule-based Windows UI automation platform with scripting and plugin support</Description>
+    <RepositoryUrl>https://github.com/jobijoy/tools</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>

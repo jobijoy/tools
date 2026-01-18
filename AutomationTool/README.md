@@ -1,225 +1,96 @@
-# Automation Tool
+# AutomationTool
 
-A modern, rule-based Windows UI automation platform built with WPF. Define rules to automatically click buttons, send keystrokes, run scripts, or alert you when specific UI elements appear. Extensible with plugins and scripting support.
+Rule-based Windows UI automation. Auto-click buttons, send keys, run scripts when specific UI elements appear.
+
+![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Features
 
-- **🎯 Rule-Based Automation** - Create flexible rules with conditions and actions
-- **🖱️ Visual Region Selector** - Draw rectangles on screen to target specific areas
-- **📜 Scripting Engine** - PowerShell and C# (Roslyn) scripting with context variables
-- **🔌 Plugin Architecture** - Extend with custom .NET DLLs or PowerShell scripts
-- **📣 Notification Hooks** - Toast, webhook, or script-based notifications
-- **📊 Event Timeline** - Live tracking of all automation events
-- **🛡️ Safety Controls** - Cooldowns, time windows, dry-run mode, confirmations
-- **🌙 Modern Dark UI** - Clean WPF interface with tabbed panels
-- **🔔 System Tray** - Runs in background with global hotkey toggle
+| Feature | Description |
+|---------|-------------|
+| Rule-Based Automation | Match UI elements by app, text, regex, element type |
+| Visual Region Selector | Draw screen regions to target specific areas |
+| Scripting | PowerShell & C# (Roslyn) with context variables |
+| Plugins | Extend with .NET DLLs or PowerShell scripts |
+| Notifications | Toast, webhook, or script hooks |
+| Safety | Cooldowns, time windows, dry-run, confirmations |
 
 ## Quick Start
 
 ```powershell
-cd AutomationTool
+# Clone and run
+git clone https://github.com/jobijoy/tools.git
+cd tools/AutomationTool
 .\Start-AutomationTool.ps1
 ```
 
-Or build and run manually:
-```powershell
-dotnet build AutomationTool.sln -c Release
-.\src\AutomationTool.App\bin\Release\net8.0-windows\AutomationTool.exe
-```
+**Requirements:** Windows 10/11, [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 
-## Creating Rules
+## Usage
 
-1. Open the control panel
-2. Click **+ Add Rule**
-3. Configure the rule:
+1. Launch app (runs in system tray)
+2. Click tray icon → **Show Panel**
+3. Add rules via **+ Add Rule**
+4. Toggle automation with **Ctrl+Alt+T** or tray menu
 
-### Target
-| Field | Description |
-|-------|-------------|
-| Target App | Process name(s) to monitor (e.g., `Code, Code - Insiders`) |
-| Window Title | Optional: window title must contain this text |
-| Element Type | Button, ListItem, Text, Link, or Any |
-| Match Text | Comma-separated patterns (e.g., `Allow, Continue, OK`) |
-| Use Regex | Treat match text as regular expression |
-| Exclude Text | Patterns to skip (e.g., `Continue Chat in`) |
+## Config Example
 
-### Action
-| Action | Description |
-|--------|-------------|
-| Click | Click the matched element |
-| SendKeys | Send keyboard input (e.g., `Tab, Enter, Ctrl+A`) |
-| RunScript | Execute PowerShell or C# script |
-| ShowNotification | Display a notification |
-| Alert | Log warning and show alert (no action) |
-| Plugin | Execute a custom plugin |
-
-### Safety
-| Field | Description |
-|-------|-------------|
-| Cooldown | Seconds between actions for this rule |
-| Time Window | Only active during hours (e.g., `09:00-17:00`) |
-| Require Focus | Only act when window is focused |
-| Dry Run | Log only, don't execute action |
-| Confirm Before | Show confirmation dialog |
-| Alert If Contains | Alert instead of act if text found nearby |
-
-## Scripting
-
-### PowerShell
-```powershell
-# Available variables: $RuleName, $MatchedText, $WindowTitle, $ProcessName, $TriggerTime
-Write-Output "Rule $RuleName matched: $MatchedText"
-```
-
-### C# (Roslyn)
-```csharp
-// Access context through globals
-Log($"Rule {Context.Rule.Name} triggered");
-return $"Window: {Context.WindowTitle}";
-```
-
-## Plugins
-
-Place plugins in the `Plugins/` folder:
-
-### PowerShell Plugin
-```powershell
-# ID: my-plugin
-# Name: My Plugin
-# Description: Does something cool
-# Version: 1.0.0
-
-# Your script code here
-Write-Output "Plugin executed for rule: $RuleName"
-```
-
-### .NET Plugin
-Implement `IPluginAction` interface and compile as DLL.
-
-## Notification Hooks
-
-Rules can trigger notifications:
-- **Toast** - System tray balloon notification
-- **Webhook** - POST JSON to URL with rule context
-- **Script** - Run custom notification script
-
-Message templates support placeholders: `{RuleName}`, `{MatchedText}`, `{WindowTitle}`, `{ProcessName}`, `{TriggerTime}`, `{Action}`
-
-## Configuration
-
-Rules are stored in `config.json`:
+`config.json` in app directory:
 
 ```json
 {
   "settings": {
     "automationEnabled": false,
     "pollingIntervalMs": 3000,
-    "toggleHotkey": "Ctrl+Alt+T",
-    "showPanelOnStart": true,
-    "minimizeToTray": true,
-    "logLevel": "Info",
-    "scriptingEnabled": true,
-    "pluginsEnabled": true,
-    "timelineEnabled": true
+    "toggleHotkey": "Ctrl+Alt+T"
   },
-  "rules": [
-    {
-      "name": "VS Code Allow",
-      "targetApp": "Code",
-      "matchText": "Allow, Continue",
-      "action": "Click",
-      "cooldownSeconds": 2,
-      "notification": {
-        "type": "toast",
-        "message": "Clicked {MatchedText} in {WindowTitle}",
-        "onSuccess": true
-      }
-    }
-  ]
+  "rules": [{
+    "name": "VS Code Allow",
+    "targetApp": "Code",
+    "matchText": "Allow, Continue",
+    "excludeTexts": ["Continue Chat in"],
+    "action": "Click",
+    "cooldownSeconds": 2
+  }]
 }
 ```
 
-## Hotkeys
+## Actions
 
-| Hotkey | Action |
-|--------|--------|
-| Ctrl+Alt+T | Toggle automation on/off (configurable) |
+| Action | Description |
+|--------|-------------|
+| `Click` | Click matched element |
+| `SendKeys` | Keyboard input (`Tab`, `Enter`, `Ctrl+A`) |
+| `RunScript` | PowerShell or C# script |
+| `ShowNotification` | Display notification |
+| `Plugin` | Run custom plugin |
 
-## Requirements
+## Scripting
 
-- Windows 10/11
-- .NET 8.0 Runtime
+**PowerShell** — Variables: `$RuleName`, `$MatchedText`, `$WindowTitle`, `$ProcessName`, `$TriggerTime`
 
-## Architecture
-
-```
-AutomationTool/
-├── Models/
-│   ├── Rule.cs              # Rule definition with all fields
-│   └── AppConfig.cs         # Global settings
-├── Services/
-│   ├── AutomationEngine.cs     # Core rule evaluation loop
-│   ├── ActionExecutor.cs       # Click, SendKeys, RunScript, Plugin
-│   ├── ConfigService.cs        # JSON config management
-│   ├── LogService.cs           # Logging with file output
-│   ├── TrayService.cs          # System tray & hotkeys
-│   ├── ScriptExecutionService.cs # PowerShell & C# scripting
-│   ├── PluginService.cs        # Plugin discovery & execution
-│   ├── NotificationService.cs  # Toast, webhook, script hooks
-│   ├── EventTimelineService.cs # Event tracking
-│   ├── RegionCaptureService.cs # Visual region selection
-│   └── Infrastructure/         # Future extensibility stubs
-└── UI/
-    ├── MainWindow.xaml         # Main panel with tabs
-    ├── RuleEditorWindow.xaml   # Rule editor dialog
-    ├── SettingsWindow.xaml     # App settings
-    └── RegionSelectorOverlay.xaml # Screen region picker
+```powershell
+Write-Output "Matched: $MatchedText in $WindowTitle"
 ```
 
-## Sample Rules
+**C# (Roslyn)** — Access via `Context` object
 
-### Auto-click VS Code permission dialogs
-```json
-{
-  "name": "VS Code Allow",
-  "targetApp": "Code",
-  "matchText": "Allow",
-  "excludeTexts": ["Continue Chat in"],
-  "action": "Click",
-  "cooldownSeconds": 2
-}
+```csharp
+Log($"Rule {Context.Rule.Name} triggered");
 ```
 
-### Log Chrome downloads with script
-```json
-{
-  "name": "Chrome Download Logger",
-  "targetApp": "chrome",
-  "matchText": "Download.*completed",
-  "useRegex": true,
-  "action": "RunScript",
-  "scriptLanguage": "powershell",
-  "script": "Add-Content -Path downloads.log -Value \"$TriggerTime: $MatchedText\""
-}
+## Plugins
+
+Drop `.ps1` or `.dll` files in `Plugins/` folder. See [Plugins/README.md](src/AutomationTool.App/Plugins/README.md).
+
+## Build
+
+```powershell
+dotnet build AutomationTool.sln -c Release
 ```
 
-### Webhook on Slack mention
-```json
-{
-  "name": "Slack Mention Alert",
-  "targetApp": "slack",
-  "matchText": "@channel|@here|@yourname",
-  "useRegex": true,
-  "action": "ShowNotification",
-  "notification": {
-    "type": "webhook",
-    "url": "https://your-webhook-url",
-    "message": "Slack mention: {MatchedText}",
-    "onSuccess": true
-  }
-}
-```
+Output: `src/AutomationTool.App/bin/Release/net8.0-windows/AutomationTool.exe`
 
 ## License
 
-MIT
+[MIT](LICENSE)
