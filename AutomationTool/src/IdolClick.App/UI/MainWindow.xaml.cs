@@ -16,6 +16,11 @@ public partial class MainWindow : Window
     private LogLevel _logLevel = LogLevel.Info;
     private List<Rule> _allRules = new();
     private string _searchText = "";
+    private bool _isExpanded = false;
+    private const double CompactWidth = 420;
+    private const double CompactHeight = 280;
+    private const double ExpandedWidth = 900;
+    private const double ExpandedHeight = 650;
 
     public MainWindow()
     {
@@ -27,6 +32,7 @@ public partial class MainWindow : Window
         SetupTimeline();
         LoadPlugins();
         LoadSettings();
+        ApplyViewMode();
 
         // Register hotkey
         App.Tray.SetMainWindow(this);
@@ -56,10 +62,87 @@ public partial class MainWindow : Window
         InputBindings.Add(new KeyBinding(new RelayCommand(_ => ClearSearch()), Key.Escape, ModifierKeys.None));
     }
 
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        // Auto-detect expanded mode based on size
+        var wasExpanded = _isExpanded;
+        _isExpanded = ActualWidth > 600 || ActualHeight > 450;
+        
+        if (wasExpanded != _isExpanded)
+            ApplyViewMode();
+    }
+
+    private void Window_StateChanged(object sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Maximized)
+        {
+            _isExpanded = true;
+            ApplyViewMode();
+        }
+    }
+
+    private void ApplyViewMode()
+    {
+        // Show/hide expanded elements
+        var expandedVisibility = _isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        var compactVisibility = _isExpanded ? Visibility.Collapsed : Visibility.Visible;
+
+        // Log panel
+        LogPanel.Visibility = expandedVisibility;
+        PanelSplitter.Visibility = expandedVisibility;
+        LogPanelRow.Height = _isExpanded ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        LogPanelRow.MinHeight = _isExpanded ? 150 : 0;
+
+        // Extended toolbar buttons
+        SearchPanel.Visibility = expandedVisibility;
+        RulesLabel.Visibility = compactVisibility;
+        ImportBtn.Visibility = expandedVisibility;
+        ExportBtn.Visibility = expandedVisibility;
+        EditBtn.Visibility = expandedVisibility;
+        DelBtn.Visibility = expandedVisibility;
+        
+        // Interval combo in footer
+        IntervalCombo.Visibility = expandedVisibility;
+        IntervalText.Visibility = compactVisibility;
+
+        // Adjust column widths based on mode
+        var cfg = App.Config.GetConfig();
+        var showExecCount = cfg.Settings.ShowExecutionCount;
+        
+        if (_isExpanded)
+        {
+            ColStatus.Width = 24;
+            ColName.Width = 130;
+            ColApp.Width = 90;
+            ColMatch.Width = 130;
+            ColAction.Width = 70;
+            ColCooldown.Width = 40;
+            ColSessionExec.Width = showExecCount ? 45 : 0;
+            ColTriggers.Width = 40;
+            ColLastTrigger.Width = 80;
+        }
+        else
+        {
+            ColStatus.Width = 22;
+            ColName.Width = 100;
+            ColApp.Width = 60;
+            ColMatch.Width = 80;
+            ColAction.Width = 50;
+            ColCooldown.Width = 28;
+            ColSessionExec.Width = showExecCount ? 35 : 0;
+            ColTriggers.Width = 22;
+            ColLastTrigger.Width = 50;
+        }
+
+        // Update title
+        Title = _isExpanded ? "Idol Click v1.0.0" : "Idol Click";
+    }
+
     private void LoadSettings()
     {
         var cfg = App.Config.GetConfig();
-        EnabledCheckBox.IsChecked = cfg.Settings.AutomationEnabled;
+        AutomationToggle.IsChecked = cfg.Settings.AutomationEnabled;
+        UpdateToggleButton();
 
         // Set interval combo
         foreach (ComboBoxItem item in IntervalCombo.Items)
@@ -67,11 +150,22 @@ public partial class MainWindow : Window
             if (item.Tag is string tag && int.TryParse(tag, out var ms) && ms == cfg.Settings.PollingIntervalMs)
             {
                 IntervalCombo.SelectedItem = item;
+                IntervalText.Text = $" • {ms / 1000}s";
                 break;
             }
         }
+        
+        // Show/hide execution count column based on setting
+        ColSessionExec.Width = cfg.Settings.ShowExecutionCount ? 35 : 0;
 
         UpdateStatus();
+    }
+
+    private void UpdateToggleButton()
+    {
+        var isRunning = AutomationToggle.IsChecked == true;
+        AutomationToggle.Content = isRunning ? "⏸" : "▶";
+        AutomationToggle.ToolTip = isRunning ? "Pause automation (Ctrl+Alt+T)" : "Start automation (Ctrl+Alt+T)";
     }
 
     private void LoadRules()
@@ -195,20 +289,23 @@ public partial class MainWindow : Window
         StatusText.Text = isRunning ? "Running" : "Paused";
 
         var cfg = App.Config.GetConfig();
-        StatsText.Text = $" | Rules: {cfg.Rules.Count(r => r.Enabled)}/{cfg.Rules.Count} | Actions: {_actionCount}";
+        var runningCount = cfg.Rules.Count(r => r.Enabled && r.IsRunning);
+        var enabledCount = cfg.Rules.Count(r => r.Enabled);
+        StatsText.Text = $" • {runningCount}/{enabledCount} running";
     }
 
     // === Event Handlers ===
 
-    private void EnabledCheckBox_Changed(object sender, RoutedEventArgs e)
+    private void AutomationToggle_Click(object sender, RoutedEventArgs e)
     {
-        var enabled = EnabledCheckBox.IsChecked == true;
+        var enabled = AutomationToggle.IsChecked == true;
         App.Engine.SetEnabled(enabled);
 
         var cfg = App.Config.GetConfig();
         cfg.Settings.AutomationEnabled = enabled;
         App.Config.SaveConfig(cfg);
 
+        UpdateToggleButton();
         UpdateStatus();
     }
 
@@ -219,6 +316,10 @@ public partial class MainWindow : Window
             var cfg = App.Config.GetConfig();
             cfg.Settings.PollingIntervalMs = ms;
             App.Config.SaveConfig(cfg);
+            
+            // Update compact interval text
+            if (IntervalText != null)
+                IntervalText.Text = $" • {ms / 1000}s";
         }
     }
 
@@ -281,8 +382,23 @@ public partial class MainWindow : Window
 
     private void RuleEnabled_Changed(object sender, RoutedEventArgs e)
     {
+        // Notify status color changed when enabled state changes
+        if (sender is System.Windows.Controls.CheckBox cb && cb.DataContext is Rule rule)
+        {
+            rule.NotifyEnabledChanged();
+        }
         App.Config.SaveConfig(App.Config.GetConfig());
         UpdateStatus();
+    }
+
+    private void RuleRunToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is Rule rule)
+        {
+            rule.IsRunning = !rule.IsRunning;
+            App.Log.Info("Rule", $"Rule '{rule.Name}' {(rule.IsRunning ? "resumed" : "paused")}");
+            UpdateStatus();
+        }
     }
 
     private void ReloadConfig_Click(object sender, RoutedEventArgs e)
@@ -497,7 +613,9 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            EnabledCheckBox.IsChecked = enabled;
+            AutomationToggle.IsChecked = enabled;
+            UpdateToggleButton();
+            UpdateStatus();
         });
     }
 
@@ -505,7 +623,8 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            EnabledCheckBox.IsChecked = !EnabledCheckBox.IsChecked;
+            AutomationToggle.IsChecked = !AutomationToggle.IsChecked;
+            AutomationToggle_Click(AutomationToggle, new RoutedEventArgs());
         });
     }
 }

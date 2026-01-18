@@ -7,15 +7,34 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    
+    <!-- Assembly Identity -->
     <AssemblyName>IdolClick</AssemblyName>
     <AssemblyTitle>IdolClick</AssemblyTitle>
     <RootNamespace>IdolClick</RootNamespace>
+    
+    <!-- Versioning: SemVer 2.0 -->
     <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0+stable</InformationalVersion>
+    
+    <!-- Package Metadata -->
     <Authors>Idol Click Contributors</Authors>
+    <Company>IdolClick</Company>
     <Product>IdolClick</Product>
-    <Description>IdolClick – Smart Windows UI automation from your system tray</Description>
+    <Description>IdolClick – Smart Windows UI automation from your system tray. Rule-based automation for clicking buttons, sending keys, and running scripts.</Description>
+    <Copyright>Copyright © 2026 IdolClick Contributors</Copyright>
     <RepositoryUrl>https://github.com/jobijoy/tools</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>automation;windows;ui;tray;wpf</PackageTags>
+    
+    <!-- Build Configuration -->
     <ApplicationIcon>Assets\idolclick.ico</ApplicationIcon>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <ItemGroup>

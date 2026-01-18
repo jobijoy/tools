@@ -5,44 +5,242 @@ namespace IdolClick.Models;
 /// <summary>
 /// Defines an automation rule with target, conditions, and actions.
 /// </summary>
-public class Rule
+public class Rule : System.ComponentModel.INotifyPropertyChanged
 {
+    private bool _isRunning = true;
+    private int _sessionExecutionCount;
+
+    /// <summary>
+    /// Schema version for future-proofing config migrations.
+    /// </summary>
+    public int SchemaVersion { get; set; } = 1;
+
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
     public string Name { get; set; } = "New Rule";
     public bool Enabled { get; set; } = true;
+    
+    /// <summary>
+    /// Whether this rule is actively running (can be toggled per-rule).
+    /// </summary>
+    public bool IsRunning
+    {
+        get => _isRunning;
+        set
+        {
+            if (_isRunning != value)
+            {
+                _isRunning = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsRunning)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(RunStateIcon)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(StatusColor)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(StatusTooltip)));
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Icon for the run state button (▶ or ⏸).
+    /// </summary>
+    [JsonIgnore]
+    public string RunStateIcon => IsRunning ? "⏸" : "▶";
+    
+    /// <summary>
+    /// Tooltip for the run state button.
+    /// </summary>
+    [JsonIgnore]
+    public string RunStateTooltip => IsRunning 
+        ? "Pause this rule – keep enabled but stop triggering" 
+        : "Run this rule – will trigger when target matches";
+    
+    /// <summary>
+    /// Color for the status indicator dot.
+    /// </summary>
+    [JsonIgnore]
+    public string StatusColor => !Enabled ? "#6B7280" : (IsRunning ? "#10B981" : "#F59E0B");
+    
+    /// <summary>
+    /// Tooltip for the status indicator.
+    /// </summary>
+    [JsonIgnore]
+    public string StatusTooltip => !Enabled 
+        ? "Disabled – this rule will not run" 
+        : (IsRunning 
+            ? "Active – this rule will auto-execute when matched" 
+            : "Paused – this rule is enabled but currently not running");
+    
+    /// <summary>
+    /// In-memory execution count for this session (resets on app restart).
+    /// </summary>
+    [JsonIgnore]
+    public int SessionExecutionCount
+    {
+        get => _sessionExecutionCount;
+        set
+        {
+            if (_sessionExecutionCount != value)
+            {
+                _sessionExecutionCount = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SessionExecutionCount)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SessionExecutionDisplay)));
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Display string for session execution count.
+    /// </summary>
+    [JsonIgnore]
+    public string SessionExecutionDisplay => _sessionExecutionCount > 0 ? $"🔁 {_sessionExecutionCount}" : "";
 
-    // === Target ===
-    public string TargetApp { get; set; } = "";           // Process name(s), comma-separated
-    public string? WindowTitle { get; set; }              // Window title contains
-    public string ElementType { get; set; } = "Button";   // Button, ListItem, Text, Link, Any
-    public string MatchText { get; set; } = "";           // Text patterns, comma-separated
-    public bool UseRegex { get; set; }                    // Treat MatchText as regex
-    public string[] ExcludeTexts { get; set; } = [];      // Patterns to exclude
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    
+    /// <summary>
+    /// Notify that Enabled changed (for status color binding).
+    /// </summary>
+    public void NotifyEnabledChanged()
+    {
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(StatusColor)));
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(StatusTooltip)));
+    }
+    
+    /// <summary>
+    /// Raises PropertyChanged for the specified property name.
+    /// </summary>
+    protected void OnPropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
 
-    // === Region Filter ===
-    public ScreenRegion? Region { get; set; }             // Normalized screen region (0-1)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TARGET CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /// <summary>
+    /// Process name(s) to target, comma-separated (e.g., "Code, Code - Insiders").
+    /// </summary>
+    public string TargetApp { get; set; } = "";
+    
+    /// <summary>
+    /// Optional window title filter. Rule only applies if window title contains this text.
+    /// </summary>
+    public string? WindowTitle { get; set; }
+    
+    /// <summary>
+    /// UI element type to match: Button, ListItem, Text, Link, or Any.
+    /// </summary>
+    public string ElementType { get; set; } = "Button";
+    
+    /// <summary>
+    /// Text patterns to match, comma-separated. Supports prefix matching for buttons with shortcuts.
+    /// </summary>
+    public string MatchText { get; set; } = "";
+    
+    /// <summary>
+    /// Treat MatchText as regular expressions instead of literal text.
+    /// </summary>
+    public bool UseRegex { get; set; }
+    
+    /// <summary>
+    /// Patterns to exclude from matching. If element text contains any of these, it's skipped.
+    /// </summary>
+    public string[] ExcludeTexts { get; set; } = [];
 
-    // === Action ===
-    public string Action { get; set; } = "Click";         // Click, SendKeys, RunScript, ShowNotification, Alert, Plugin
-    public string? Keys { get; set; }                     // For SendKeys action
-    public string? Script { get; set; }                   // Inline script content or file path
-    public string ScriptLanguage { get; set; } = "powershell"; // powershell, csharp
-    public string? NotificationMessage { get; set; }      // For ShowNotification
-    public string? PluginId { get; set; }                 // For Plugin action
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REGION FILTER
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /// <summary>
+    /// Optional normalized screen region (0.0 to 1.0) to constrain element matching.
+    /// </summary>
+    public ScreenRegion? Region { get; set; }
 
-    // === Notification Hooks ===
-    public NotificationConfig? Notification { get; set; } // Optional notification routing
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ACTION CONFIGURATION  
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /// <summary>
+    /// Action to perform: Click, SendKeys, RunScript, ShowNotification, Alert, or Plugin.
+    /// </summary>
+    public string Action { get; set; } = "Click";
+    
+    /// <summary>
+    /// Keys to send for SendKeys action (e.g., "Tab", "Enter", "Ctrl+A").
+    /// </summary>
+    public string? Keys { get; set; }
+    
+    /// <summary>
+    /// Inline script content or file path for RunScript action.
+    /// </summary>
+    public string? Script { get; set; }
+    
+    /// <summary>
+    /// Script language: "powershell" or "csharp".
+    /// </summary>
+    public string ScriptLanguage { get; set; } = "powershell";
+    
+    /// <summary>
+    /// Message to display for ShowNotification action.
+    /// </summary>
+    public string? NotificationMessage { get; set; }
+    
+    /// <summary>
+    /// Plugin identifier for Plugin action.
+    /// </summary>
+    public string? PluginId { get; set; }
 
-    // === Safety & Timing ===
-    public int CooldownSeconds { get; set; } = 2;         // Min seconds between actions
-    public string? TimeWindow { get; set; }               // e.g., "09:00-17:00"
-    public bool RequireFocus { get; set; }                // Only act if window is focused
-    public bool ConfirmBeforeAction { get; set; }         // Show confirmation dialog
-    public string[] AlertIfContains { get; set; } = [];   // Alert instead of act if text found nearby
-    public bool DryRun { get; set; }                      // Log but don't execute action
+    // ═══════════════════════════════════════════════════════════════════════════
+    // NOTIFICATION HOOKS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /// <summary>
+    /// Optional notification configuration for webhooks, toasts, or script hooks.
+    /// </summary>
+    public NotificationConfig? Notification { get; set; }
 
-    // === Metadata ===
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SAFETY & TIMING
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /// <summary>
+    /// Minimum seconds between consecutive triggers of this rule.
+    /// </summary>
+    public int CooldownSeconds { get; set; } = 2;
+    
+    /// <summary>
+    /// Time window when rule is active (e.g., "09:00-17:00"). Empty = always active.
+    /// </summary>
+    public string? TimeWindow { get; set; }
+    
+    /// <summary>
+    /// Only trigger if the target window has keyboard focus.
+    /// </summary>
+    public bool RequireFocus { get; set; }
+    
+    /// <summary>
+    /// Show confirmation dialog before executing the action.
+    /// </summary>
+    public bool ConfirmBeforeAction { get; set; }
+    
+    /// <summary>
+    /// Show alert instead of executing if any of these patterns are found near the element.
+    /// </summary>
+    public string[] AlertIfContains { get; set; } = [];
+    
+    /// <summary>
+    /// Log actions without actually executing them. Useful for testing rules.
+    /// </summary>
+    public bool DryRun { get; set; }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // METADATA (Persisted)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /// <summary>
+    /// Timestamp of last successful trigger. Persisted to config.
+    /// </summary>
     public DateTime? LastTriggered { get; set; }
+    
+    /// <summary>
+    /// Total trigger count across all sessions. Persisted to config.
+    /// </summary>
     public int TriggerCount { get; set; }
 }
 

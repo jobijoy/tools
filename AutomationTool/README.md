@@ -45,6 +45,28 @@ cd tools/AutomationTool
 3. Add rules via **+ Add Rule**
 4. Toggle automation with **Ctrl+Alt+T** or tray menu
 
+## 🔥 Hotkey Launching (Ctrl+Alt+T)
+
+You can start or toggle IdolClick using the same hotkey:
+
+### When App is Running
+- Press **Ctrl+Alt+T** to show/hide the control panel
+- Works globally from any application
+
+### When App is Not Running
+Create a Windows shortcut with the hotkey:
+
+1. Right-click `IdolClick.exe` → **Create shortcut**
+2. Move shortcut to Desktop or Start Menu folder
+3. Right-click shortcut → **Properties**
+4. Click in **Shortcut key** field → Press **Ctrl+Alt+T**
+5. Click **OK**
+
+Now **Ctrl+Alt+T** launches the app if closed, or toggles the window if running!
+
+### Pro Tip: Auto-Start
+Enable **"Start with Windows"** in Settings so IdolClick is always running in tray.
+
 ## Config Example
 
 `config.json` in app directory:

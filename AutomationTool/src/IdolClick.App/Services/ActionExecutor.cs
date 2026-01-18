@@ -4,20 +4,43 @@ using IdolClick.Models;
 namespace IdolClick.Services;
 
 /// <summary>
-/// Executes automation actions (click, sendkeys, script, plugins).
+/// Executes automation actions on matched UI elements.
 /// </summary>
+/// <remarks>
+/// <para>Supported actions:</para>
+/// <list type="table">
+///   <item><term>Click</term><description>Invokes UI element via pattern or simulated click</description></item>
+///   <item><term>SendKeys</term><description>Sends keyboard input to active window</description></item>
+///   <item><term>RunScript</term><description>Executes PowerShell or C# script</description></item>
+///   <item><term>ShowNotification</term><description>Displays toast notification</description></item>
+///   <item><term>Plugin</term><description>Runs external plugin</description></item>
+///   <item><term>Alert</term><description>Shows modal alert dialog</description></item>
+/// </list>
+/// </remarks>
 public class ActionExecutor
 {
     private readonly LogService _log;
 
+    /// <summary>
+    /// Initializes a new action executor instance.
+    /// </summary>
+    /// <param name="log">Logging service for diagnostics.</param>
     public ActionExecutor(LogService log)
     {
-        _log = log;
+        _log = log ?? throw new ArgumentNullException(nameof(log));
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // MAIN ENTRY POINT
+    // ═══════════════════════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Execute the action defined in a rule.
+    /// Executes the action defined in a rule against the matched element.
     /// </summary>
+    /// <param name="rule">Rule defining the action to execute.</param>
+    /// <param name="element">Matched UI automation element.</param>
+    /// <param name="context">Optional context with window and process info.</param>
+    /// <returns>True if action succeeded, false otherwise.</returns>
     public async Task<bool> ExecuteRuleActionAsync(Rule rule, AutomationElement element, AutomationContext? context = null)
     {
         if (rule.DryRun)
@@ -48,22 +71,7 @@ public class ActionExecutor
             // Send notification if configured
             if (rule.Notification != null)
             {
-                var shouldNotify = (success && rule.Notification.OnSuccess) || (!success && rule.Notification.OnFailure);
-                if (shouldNotify)
-                {
-                    var notifyContext = new NotificationContext
-                    {
-                        Rule = rule,
-                        MatchedText = context.MatchedText,
-                        WindowTitle = context.WindowTitle,
-                        ProcessName = context.ProcessName,
-                        TriggerTime = DateTime.Now,
-                        ActionTaken = rule.Action
-                    };
-
-                    var sent = await App.Notifications.SendAsync(rule.Notification, notifyContext);
-                    App.Timeline.RecordNotification(rule.Id, rule.Name, rule.Notification.Type ?? "unknown", sent);
-                }
+                await SendNotificationIfNeeded(rule, context, success);
             }
 
             return success;
@@ -75,6 +83,35 @@ public class ActionExecutor
             return false;
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // NOTIFICATION HELPER
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    private async Task SendNotificationIfNeeded(Rule rule, AutomationContext context, bool success)
+    {
+        if (rule.Notification == null) return;
+        
+        var shouldNotify = (success && rule.Notification.OnSuccess) || (!success && rule.Notification.OnFailure);
+        if (!shouldNotify) return;
+
+        var notifyContext = new NotificationContext
+        {
+            Rule = rule,
+            MatchedText = context.MatchedText,
+            WindowTitle = context.WindowTitle,
+            ProcessName = context.ProcessName,
+            TriggerTime = DateTime.Now,
+            ActionTaken = rule.Action
+        };
+
+        var sent = await App.Notifications.SendAsync(rule.Notification, notifyContext);
+        App.Timeline.RecordNotification(rule.Id, rule.Name, rule.Notification.Type ?? "unknown", sent);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ACTION IMPLEMENTATIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
 
     private bool ExecuteClick(AutomationElement element)
     {
@@ -144,6 +181,16 @@ public class ActionExecutor
         return true;
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // CLICK IMPLEMENTATION
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Clicks a UI element using the most reliable method available.
+    /// </summary>
+    /// <remarks>
+    /// Attempts methods in order: InvokePattern → ClickablePoint → BoundingRect center.
+    /// </remarks>
     public void ClickElement(AutomationElement element)
     {
         // Try InvokePattern first (most reliable)
@@ -176,6 +223,13 @@ public class ActionExecutor
         catch { }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // WINDOW & KEYBOARD
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Brings a window to the foreground and activates it.
+    /// </summary>
     public void ActivateWindow(AutomationElement window)
     {
         try
@@ -187,9 +241,12 @@ public class ActionExecutor
         catch { }
     }
 
+    /// <summary>
+    /// Sends keyboard input to the active window.
+    /// </summary>
+    /// <param name="keys">Comma-separated key names (e.g., "Tab, Enter, Ctrl+A").</param>
     public void SendKeys(string keys)
     {
-        // Parse key string like "Tab, Enter, Ctrl+A"
         var keyList = keys.Split(',', StringSplitOptions.TrimEntries);
         foreach (var key in keyList)
         {
@@ -198,6 +255,9 @@ public class ActionExecutor
         }
     }
 
+    /// <summary>
+    /// Sends a single key or key combination.
+    /// </summary>
     private void SendKey(string keyName)
     {
         var lower = keyName.ToLowerInvariant();
@@ -259,6 +319,15 @@ public class ActionExecutor
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SCRIPT EXECUTION
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Runs a script in the specified language.
+    /// </summary>
+    /// <param name="language">"powershell" or "csharp".</param>
+    /// <param name="script">Script content to execute.</param>
     public void RunScript(string language, string script)
     {
         try
@@ -282,9 +351,11 @@ public class ActionExecutor
         }
     }
 
+    /// <summary>
+    /// Executes a PowerShell script via process spawn.
+    /// </summary>
     private void RunPowerShell(string script)
     {
-        // Run PowerShell script via process
         var psi = new System.Diagnostics.ProcessStartInfo
         {
             FileName = "powershell.exe",

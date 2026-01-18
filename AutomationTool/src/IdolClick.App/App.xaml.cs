@@ -8,7 +8,10 @@ namespace IdolClick;
 public partial class App : Application
 {
     private static Mutex? _mutex;
+    private static EventWaitHandle? _showWindowEvent;
+    private static Thread? _signalListenerThread;
     private const string MutexName = "IdolClick_SingleInstance_Mutex";
+    private const string EventName = "IdolClick_ShowWindow_Event";
     
     public static ConfigService Config { get; private set; } = null!;
     public static LogService Log { get; private set; } = null!;
@@ -22,6 +25,7 @@ public partial class App : Application
 
     private SplashWindow? _splash;
     private MainWindow? _mainWindow;
+    private bool _isShuttingDown;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -30,14 +34,14 @@ public partial class App : Application
         
         if (!createdNew)
         {
-            System.Windows.MessageBox.Show(
-                "Idol Click is already running.\n\nCheck the system tray for the existing instance.",
-                "Idol Click", 
-                MessageBoxButton.OK, 
-                MessageBoxImage.Information);
+            // Another instance is running - signal it to show window
+            SignalExistingInstance();
             Shutdown();
             return;
         }
+
+        // Start listening for signals from other instances
+        StartSignalListener();
 
         base.OnStartup(e);
 
@@ -136,6 +140,70 @@ public partial class App : Application
         });
     }
 
+    /// <summary>
+    /// Signal the existing instance to show its window.
+    /// </summary>
+    private static void SignalExistingInstance()
+    {
+        try
+        {
+            using var evt = EventWaitHandle.OpenExisting(EventName);
+            evt.Set();
+        }
+        catch
+        {
+            // Event doesn't exist yet, instance might still be starting
+        }
+    }
+
+    /// <summary>
+    /// Start listening for signals from other instances.
+    /// </summary>
+    private void StartSignalListener()
+    {
+        _showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, EventName);
+        
+        _signalListenerThread = new Thread(() =>
+        {
+            while (!_isShuttingDown)
+            {
+                try
+                {
+                    // Wait for signal with timeout so we can check shutdown flag
+                    if (_showWindowEvent.WaitOne(500))
+                    {
+                        // Signal received - show main window
+                        Dispatcher.BeginInvoke(() => ShowMainWindow());
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "IdolClick_SignalListener"
+        };
+        _signalListenerThread.Start();
+    }
+
+    /// <summary>
+    /// Show and activate the main window.
+    /// </summary>
+    public void ShowMainWindow()
+    {
+        if (_mainWindow == null) return;
+        
+        _mainWindow.Show();
+        _mainWindow.WindowState = WindowState.Normal;
+        _mainWindow.Activate();
+        _mainWindow.Topmost = true;  // Bring to front
+        _mainWindow.Topmost = false; // Reset topmost
+        _mainWindow.Focus();
+    }
+
     private void UpdateSplash(string status, double progress)
     {
         Dispatcher.Invoke(() => _splash?.UpdateStatus(status, progress));
@@ -143,7 +211,14 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _isShuttingDown = true;
         Log?.Info("App", "Shutting down");
+        
+        // Clean up signal listener
+        _showWindowEvent?.Set(); // Wake up listener thread
+        _signalListenerThread?.Join(1000);
+        _showWindowEvent?.Dispose();
+        
         Timeline?.Dispose();
         Tray?.Dispose();
         Engine?.Dispose();

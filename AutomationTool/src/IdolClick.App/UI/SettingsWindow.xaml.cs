@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
         MinimizeToTrayCheck.IsChecked = s.MinimizeToTray;
         ShowPanelOnStartCheck.IsChecked = s.ShowPanelOnStart;
         MouseNudgeCheck.IsChecked = s.GlobalMouseNudge;
+        ShowExecutionCountCheck.IsChecked = s.ShowExecutionCount;
         StartWithWindowsCheck.IsChecked = IsStartupEnabled();
     }
 
@@ -79,6 +80,7 @@ public partial class SettingsWindow : Window
         s.MinimizeToTray = MinimizeToTrayCheck.IsChecked == true;
         s.ShowPanelOnStart = ShowPanelOnStartCheck.IsChecked == true;
         s.GlobalMouseNudge = MouseNudgeCheck.IsChecked == true;
+        s.ShowExecutionCount = ShowExecutionCountCheck.IsChecked == true;
 
         App.Config.SaveConfig(cfg);
         App.Log.SetLevel(s.LogLevel);
