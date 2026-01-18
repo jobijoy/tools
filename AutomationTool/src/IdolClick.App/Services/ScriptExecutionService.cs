@@ -2,79 +2,24 @@ using System.Diagnostics;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Text;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.Scripting;
 using IdolClick.Models;
 
 namespace IdolClick.Services;
 
 /// <summary>
-/// Executes PowerShell and C# scripts with safety features.
+/// Executes PowerShell scripts with safety features.
+/// C# scripting is disabled in single-file publish mode.
 /// </summary>
 public class ScriptExecutionService : IScriptExecutionService
 {
     private readonly LogService _log;
     private readonly ConfigService _config;
-    private ScriptOptions? _csharpOptions;
-    private bool _csharpInitialized;
-    private string? _csharpInitError;
-    private static readonly string[] _supportedLanguages = ["powershell", "csharp"];
+    private static readonly string[] _supportedLanguages = ["powershell"];
 
     public ScriptExecutionService(LogService log, ConfigService config)
     {
         _log = log;
         _config = config;
-        // Defer C# script options initialization to avoid single-file publish issues
-    }
-
-    /// <summary>
-    /// Lazily initializes C# scripting options. Returns false if initialization fails.
-    /// </summary>
-    private bool EnsureCSharpInitialized()
-    {
-        if (_csharpInitialized) return _csharpOptions != null;
-
-        _csharpInitialized = true;
-        
-        try
-        {
-            // Only add references that have a valid location (not single-file bundled)
-            var assemblies = new[]
-            {
-                typeof(object).Assembly,
-                typeof(Enumerable).Assembly,
-                typeof(System.Net.Http.HttpClient).Assembly,
-                typeof(System.Text.Json.JsonSerializer).Assembly
-            }.Where(a => !string.IsNullOrEmpty(a.Location)).ToArray();
-
-            if (assemblies.Length == 0)
-            {
-                _csharpInitError = "C# scripting unavailable in single-file mode. Use PowerShell scripts instead.";
-                _log.Warn("Script", _csharpInitError);
-                return false;
-            }
-
-            _csharpOptions = ScriptOptions.Default
-                .AddReferences(assemblies)
-                .AddImports(
-                    "System",
-                    "System.IO",
-                    "System.Linq",
-                    "System.Text",
-                    "System.Collections.Generic",
-                    "System.Threading.Tasks",
-                    "System.Net.Http",
-                    "System.Text.Json");
-
-            _log.Debug("Script", "C# scripting initialized successfully");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _csharpInitError = $"C# scripting initialization failed: {ex.Message}";
-            _log.Warn("Script", _csharpInitError);
-            return false;
-        }
     }
 
     public bool IsScriptingEnabled => _config.GetConfig().Settings.ScriptingEnabled;
@@ -108,7 +53,7 @@ public class ScriptExecutionService : IScriptExecutionService
             var result = language.ToLowerInvariant() switch
             {
                 "powershell" => await ExecutePowerShellAsync(scriptContent, context, timeoutMs),
-                "csharp" or "c#" => await ExecuteCSharpAsync(scriptContent, context, timeoutMs),
+                "csharp" or "c#" => ScriptResult.Failed("C# scripting is not available in single-file mode. Use PowerShell instead."),
                 _ => ScriptResult.Failed($"Unsupported script language: {language}")
             };
 
@@ -126,8 +71,6 @@ public class ScriptExecutionService : IScriptExecutionService
     {
         return await Task.Run(() =>
         {
-            using var cts = new CancellationTokenSource(timeoutMs > 0 ? timeoutMs : Timeout.Infinite);
-
             try
             {
                 var initialState = InitialSessionState.CreateDefault();
@@ -203,60 +146,4 @@ public class ScriptExecutionService : IScriptExecutionService
             }
         });
     }
-
-    private async Task<ScriptResult> ExecuteCSharpAsync(string script, ScriptContext? context, int timeoutMs)
-    {
-        // Lazy initialization of C# scripting
-        if (!EnsureCSharpInitialized())
-        {
-            return ScriptResult.Failed(_csharpInitError ?? "C# scripting not available");
-        }
-
-        using var cts = new CancellationTokenSource(timeoutMs > 0 ? timeoutMs : Timeout.Infinite);
-
-        try
-        {
-            // Create globals object for the script
-            var globals = new ScriptGlobals
-            {
-                Context = context ?? new ScriptContext(),
-                Log = (msg) => _log.Info("Script", msg)
-            };
-
-            // Run with timeout using Task.Run + cancellation
-            var task = CSharpScript.EvaluateAsync<object?>(script, _csharpOptions!, globals);
-            
-            var completedTask = await Task.WhenAny(task, Task.Delay(timeoutMs > 0 ? timeoutMs : Timeout.Infinite, cts.Token));
-            
-            if (completedTask != task)
-            {
-                return ScriptResult.Timeout();
-            }
-
-            var result = await task;
-            return ScriptResult.Succeeded(result?.ToString(), result);
-        }
-        catch (OperationCanceledException)
-        {
-            return ScriptResult.Timeout();
-        }
-        catch (CompilationErrorException ex)
-        {
-            var errors = string.Join("\n", ex.Diagnostics.Select(d => d.ToString()));
-            return ScriptResult.Failed($"Compilation errors:\n{errors}");
-        }
-        catch (Exception ex)
-        {
-            return ScriptResult.Failed(ex.Message);
-        }
-    }
-}
-
-/// <summary>
-/// Global variables available to C# scripts.
-/// </summary>
-public class ScriptGlobals
-{
-    public ScriptContext Context { get; set; } = new();
-    public Action<string> Log { get; set; } = _ => { };
 }
