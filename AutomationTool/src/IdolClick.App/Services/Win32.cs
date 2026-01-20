@@ -26,6 +26,7 @@ internal static class Win32
 
     private const uint INPUT_MOUSE = 0;
     private const uint INPUT_KEYBOARD = 1;
+    private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP = 0x0004;
     private const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
@@ -89,9 +90,13 @@ internal static class Win32
         int normalizedX = (int)(((x - vsLeft) * 65535.0) / vsWidth);
         int normalizedY = (int)(((y - vsTop) * 65535.0) / vsHeight);
 
+        // First move the cursor physically to ensure correct position
+        SetCursorPos(x, y);
+        Thread.Sleep(10);  // Small delay to ensure cursor is positioned
+
         var inputs = new[]
         {
-            // Move mouse to absolute position on virtual desktop
+            // Mouse down at current cursor position
             new INPUT 
             { 
                 type = INPUT_MOUSE, 
@@ -101,14 +106,24 @@ internal static class Win32
                     { 
                         dx = normalizedX, 
                         dy = normalizedY, 
-                        dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK 
+                        dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN
                     } 
                 } 
             },
-            // Mouse down
-            new INPUT { type = INPUT_MOUSE, U = new InputUnion { mi = new MOUSEINPUT { dwFlags = MOUSEEVENTF_LEFTDOWN } } },
             // Mouse up
-            new INPUT { type = INPUT_MOUSE, U = new InputUnion { mi = new MOUSEINPUT { dwFlags = MOUSEEVENTF_LEFTUP } } }
+            new INPUT 
+            { 
+                type = INPUT_MOUSE, 
+                U = new InputUnion 
+                { 
+                    mi = new MOUSEINPUT 
+                    { 
+                        dx = normalizedX, 
+                        dy = normalizedY, 
+                        dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_LEFTUP 
+                    } 
+                } 
+            }
         };
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
     }

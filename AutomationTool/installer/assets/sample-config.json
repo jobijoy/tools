@@ -23,7 +23,7 @@
       "elementType": "Button",
       "matchText": "Allow, Continue, OK, Yes",
       "useRegex": false,
-      "excludeTexts": ["Don't Allow", "Cancel", "No"],
+      "excludeTexts": ["Don't Allow", "Cancel", "No", "Continue Chat", "Continue in"],
       "action": "Click",
       "cooldownSeconds": 5,
       "dryRun": false
@@ -35,7 +35,7 @@
       "isRunning": true,
       "targetApp": "Code, Code - Insiders",
       "windowTitle": "",
-      "elementType": "Text",
+      "elementType": "Any",
       "matchText": "jobijoy",
       "useRegex": false,
       "excludeTexts": [],
