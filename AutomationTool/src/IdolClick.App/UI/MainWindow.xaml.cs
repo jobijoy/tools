@@ -600,9 +600,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private Rule? _selectedRule;
+    
+    private void RulesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedRule = RulesListView.SelectedItem as Rule;
+        UpdateDeleteButtonState();
+    }
+    
+    private void UpdateDeleteButtonState()
+    {
+        if (_isExpanded && _selectedRule != null)
+        {
+            DelBtn.Visibility = Visibility.Visible;
+        }
+        else if (!_isExpanded)
+        {
+            DelBtn.Visibility = Visibility.Collapsed;
+        }
+    }
+    
     private void DeleteRule_Click(object sender, RoutedEventArgs e)
     {
-        if (RulesListView.SelectedItem is Rule rule)
+        var rule = _selectedRule ?? RulesListView.SelectedItem as Rule;
+        if (rule != null)
         {
             var result = MessageBox.Show($"Delete rule '{rule.Name}'?", "Confirm Delete",
                 MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -613,7 +634,9 @@ public partial class MainWindow : Window
                 cfg.Rules.RemoveAll(r => r.Id == rule.Id);
                 App.Config.SaveConfig(cfg);
                 App.Profiles.SaveCurrentProfile();
+                _selectedRule = null;
                 LoadRules();
+                UpdateDeleteButtonState();
             }
         }
     }

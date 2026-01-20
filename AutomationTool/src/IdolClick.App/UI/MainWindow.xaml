@@ -190,7 +190,7 @@
 
                 <!-- Compact Rules List -->
                 <ListView x:Name="RulesListView" Grid.Row="1" BorderThickness="0" SelectionMode="Single" 
-                          MouseDoubleClick="RulesListView_DoubleClick" FontSize="11">
+                          MouseDoubleClick="RulesListView_DoubleClick" SelectionChanged="RulesListView_SelectionChanged" FontSize="11">
                     <ListView.View>
                         <GridView x:Name="RulesGridView">
                             <!-- Status Indicator Column -->

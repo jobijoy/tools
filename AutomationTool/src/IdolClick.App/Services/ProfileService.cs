@@ -54,6 +54,13 @@ public class ProfileService
             if (!string.IsNullOrEmpty(name))
                 _activeProfile = name;
         }
+        
+        // Ensure Default profile is saved on first run
+        var defaultPath = GetProfilePath("Default");
+        if (!File.Exists(defaultPath))
+        {
+            SaveCurrentToProfile("Default");
+        }
     }
 
     /// <summary>
