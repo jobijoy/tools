@@ -1,13 +1,11 @@
 using System.Diagnostics;
-using System.Management.Automation;
-using System.Management.Automation.Runspaces;
 using System.Text;
 using IdolClick.Models;
 
 namespace IdolClick.Services;
 
 /// <summary>
-/// Executes PowerShell scripts with safety features.
+/// Executes PowerShell scripts via process spawning (lightweight, no SDK dependency).
 /// C# scripting is disabled in single-file publish mode.
 /// </summary>
 public class ScriptExecutionService : IScriptExecutionService
@@ -67,83 +65,107 @@ public class ScriptExecutionService : IScriptExecutionService
         }
     }
 
+    /// <summary>
+    /// Executes PowerShell via process spawn (lightweight, no SDK required).
+    /// </summary>
     private async Task<ScriptResult> ExecutePowerShellAsync(string script, ScriptContext? context, int timeoutMs)
     {
-        return await Task.Run(() =>
+        try
         {
+            // Build script with context variables prepended
+            var fullScript = new StringBuilder();
+            
+            if (context != null)
+            {
+                fullScript.AppendLine($"$RuleName = '{EscapeForPowerShell(context.Rule?.Name)}'");
+                fullScript.AppendLine($"$MatchedText = '{EscapeForPowerShell(context.MatchedText)}'");
+                fullScript.AppendLine($"$WindowTitle = '{EscapeForPowerShell(context.WindowTitle)}'");
+                fullScript.AppendLine($"$ProcessName = '{EscapeForPowerShell(context.ProcessName)}'");
+                fullScript.AppendLine($"$TriggerTime = [DateTime]::Parse('{context.TriggerTime:o}')");
+                
+                foreach (var kvp in context.Variables)
+                {
+                    fullScript.AppendLine($"${kvp.Key} = '{EscapeForPowerShell(kvp.Value?.ToString())}'");
+                }
+            }
+            
+            fullScript.Append(script);
+
+            // Create temp script file for complex scripts
+            var tempFile = Path.Combine(Path.GetTempPath(), $"idolclick_{Guid.NewGuid():N}.ps1");
+            await File.WriteAllTextAsync(tempFile, fullScript.ToString());
+
             try
             {
-                var initialState = InitialSessionState.CreateDefault();
-                using var runspace = RunspaceFactory.CreateRunspace(initialState);
-                runspace.Open();
-
-                using var ps = PowerShell.Create();
-                ps.Runspace = runspace;
-
-                // Add context variables
-                if (context != null)
+                var psi = new ProcessStartInfo
                 {
-                    ps.AddCommand("Set-Variable").AddParameter("Name", "RuleName").AddParameter("Value", context.Rule?.Name);
-                    ps.AddStatement();
-                    ps.AddCommand("Set-Variable").AddParameter("Name", "MatchedText").AddParameter("Value", context.MatchedText);
-                    ps.AddStatement();
-                    ps.AddCommand("Set-Variable").AddParameter("Name", "WindowTitle").AddParameter("Value", context.WindowTitle);
-                    ps.AddStatement();
-                    ps.AddCommand("Set-Variable").AddParameter("Name", "ProcessName").AddParameter("Value", context.ProcessName);
-                    ps.AddStatement();
-                    ps.AddCommand("Set-Variable").AddParameter("Name", "TriggerTime").AddParameter("Value", context.TriggerTime);
-                    ps.AddStatement();
+                    FileName = "pwsh.exe",  // Try PowerShell 7 first
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{tempFile}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
 
-                    foreach (var kvp in context.Variables)
-                    {
-                        ps.AddCommand("Set-Variable").AddParameter("Name", kvp.Key).AddParameter("Value", kvp.Value);
-                        ps.AddStatement();
-                    }
+                // Fallback to Windows PowerShell if pwsh not found
+                try
+                {
+                    using var testProc = Process.Start(new ProcessStartInfo { FileName = "pwsh.exe", Arguments = "-Version", UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true });
+                    testProc?.WaitForExit(1000);
+                }
+                catch
+                {
+                    psi.FileName = "powershell.exe";
                 }
 
-                ps.AddScript(script);
-
-                var output = new StringBuilder();
-                var errors = new StringBuilder();
-                object? lastResult = null;
-
-                var results = ps.Invoke();
-
-                foreach (var item in results)
+                using var proc = Process.Start(psi);
+                if (proc == null)
                 {
-                    if (item != null)
-                    {
-                        output.AppendLine(item.ToString());
-                        lastResult = item.BaseObject;
-                    }
+                    return ScriptResult.Failed("Failed to start PowerShell process");
                 }
 
-                foreach (var error in ps.Streams.Error)
+                var outputTask = proc.StandardOutput.ReadToEndAsync();
+                var errorTask = proc.StandardError.ReadToEndAsync();
+
+                var completed = proc.WaitForExit(timeoutMs);
+                
+                if (!completed)
                 {
-                    errors.AppendLine(error.ToString());
+                    proc.Kill();
+                    return ScriptResult.Timeout();
                 }
 
-                if (errors.Length > 0)
+                var output = await outputTask;
+                var error = await errorTask;
+
+                if (!string.IsNullOrEmpty(error))
                 {
-                    _log.Warn("Script", $"PowerShell errors: {errors}");
+                    _log.Warn("Script", $"PowerShell stderr: {error.Trim()}");
                 }
 
                 return new ScriptResult
                 {
-                    Success = !ps.HadErrors,
-                    Output = output.ToString().TrimEnd(),
-                    Error = errors.Length > 0 ? errors.ToString().TrimEnd() : null,
-                    ReturnValue = lastResult
+                    Success = proc.ExitCode == 0,
+                    Output = output.TrimEnd(),
+                    Error = string.IsNullOrWhiteSpace(error) ? null : error.TrimEnd(),
+                    ReturnValue = output.TrimEnd()
                 };
             }
-            catch (OperationCanceledException)
+            finally
             {
-                return ScriptResult.Timeout();
+                // Clean up temp file
+                try { File.Delete(tempFile); } catch { }
             }
-            catch (Exception ex)
-            {
-                return ScriptResult.Failed(ex.Message);
-            }
-        });
+        }
+        catch (Exception ex)
+        {
+            return ScriptResult.Failed(ex.Message);
+        }
+    }
+
+    private static string EscapeForPowerShell(string? value)
+    {
+        if (value == null) return "";
+        return value.Replace("'", "''");
     }
 }

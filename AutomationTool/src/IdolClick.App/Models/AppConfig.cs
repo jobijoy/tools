@@ -34,9 +34,9 @@ public class GlobalSettings
     public bool AutomationEnabled { get; set; } = true;
     
     /// <summary>
-    /// Interval in milliseconds between rule evaluation cycles. Minimum 500ms.
+    /// Interval in milliseconds between rule evaluation cycles. Minimum 5000ms (5 seconds).
     /// </summary>
-    public int PollingIntervalMs { get; set; } = 3000;
+    public int PollingIntervalMs { get; set; } = 10000;
     
     /// <summary>
     /// Global hotkey to toggle automation (e.g., "Ctrl+Alt+T").

@@ -171,24 +171,14 @@ public partial class RuleEditorWindow : Window
             var region = await App.RegionCapture.CaptureRegionAsync();
             if (region != null)
             {
-                // Get screen dimensions for normalization
-                var screen = System.Windows.Forms.Screen.PrimaryScreen;
-                if (screen != null)
-                {
-                    var normalized = region.ToScreenNormalized(screen.Bounds.Width, screen.Bounds.Height);
-                    RegionXBox.Text = normalized.X.ToString("0.####");
-                    RegionYBox.Text = normalized.Y.ToString("0.####");
-                    RegionWidthBox.Text = normalized.Width.ToString("0.####");
-                    RegionHeightBox.Text = normalized.Height.ToString("0.####");
-                }
-                else
-                {
-                    // Fallback: use absolute pixels
-                    RegionXBox.Text = region.X.ToString();
-                    RegionYBox.Text = region.Y.ToString();
-                    RegionWidthBox.Text = region.Width.ToString();
-                    RegionHeightBox.Text = region.Height.ToString();
-                }
+                // Get virtual screen dimensions for normalization (supports multi-monitor)
+                var screenWidth = (int)SystemParameters.VirtualScreenWidth;
+                var screenHeight = (int)SystemParameters.VirtualScreenHeight;
+                var normalized = region.ToScreenNormalized(screenWidth, screenHeight);
+                RegionXBox.Text = normalized.X.ToString("0.####");
+                RegionYBox.Text = normalized.Y.ToString("0.####");
+                RegionWidthBox.Text = normalized.Width.ToString("0.####");
+                RegionHeightBox.Text = normalized.Height.ToString("0.####");
             }
         }
         finally

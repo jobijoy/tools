@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "settings": {
     "automationEnabled": true,
-    "pollingIntervalMs": 1000,
+    "pollingIntervalMs": 10000,
     "showPanelOnStart": true,
     "minimizeToTray": true,
     "toggleHotkey": "Ctrl+Alt+T",
@@ -15,8 +15,8 @@
   },
   "rules": [
     {
-      "id": "vscode-auto-click",
-      "name": "VS Code Auto-Click",
+      "id": "vscode-copilot-allow",
+      "name": "VS Code Copilot Allow/Continue",
       "enabled": true,
       "isRunning": true,
       "targetApp": "Code, Code - Insiders",
@@ -24,24 +24,24 @@
       "elementType": "Button",
       "matchText": "Allow, Continue, OK, Yes",
       "useRegex": false,
-      "excludeTexts": ["Don't Allow", "Cancel"],
+      "excludeTexts": ["Don't Allow", "Cancel", "No"],
       "action": "Click",
-      "cooldownSeconds": 2,
+      "cooldownSeconds": 5,
       "dryRun": false
     },
     {
-      "id": "github-select-account",
-      "name": "GitHub Select Account",
+      "id": "github-select-jobijoy",
+      "name": "GitHub Select jobijoy Account",
       "enabled": true,
       "isRunning": true,
       "targetApp": "Code, Code - Insiders",
-      "windowTitle": "Select an account",
-      "elementType": "ListItem",
+      "windowTitle": "",
+      "elementType": "Text",
       "matchText": "jobijoy",
       "useRegex": false,
       "excludeTexts": [],
       "action": "Click",
-      "cooldownSeconds": 2,
+      "cooldownSeconds": 5,
       "dryRun": false
     }
   ]

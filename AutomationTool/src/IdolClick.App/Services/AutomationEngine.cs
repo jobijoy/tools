@@ -115,7 +115,7 @@ public class AutomationEngine : IDisposable
         while (!ct.IsCancellationRequested)
         {
             var cfg = _config.GetConfig();
-            var interval = Math.Max(500, cfg.Settings.PollingIntervalMs);
+            var interval = Math.Max(5000, cfg.Settings.PollingIntervalMs); // Minimum 5 seconds to prevent rapid loops
 
             if (_enabled)
             {

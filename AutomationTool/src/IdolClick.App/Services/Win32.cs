@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace IdolClick.Services;
 
 /// <summary>
-/// Win32 API helpers for mouse/keyboard input.
+/// Win32 API helpers for mouse/keyboard input with multi-monitor support.
 /// </summary>
 internal static class Win32
 {
@@ -28,6 +28,8 @@ internal static class Win32
     private const uint INPUT_KEYBOARD = 1;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP = 0x0004;
+    private const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
+    private const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;  // For multi-monitor support
     private const uint KEYEVENTF_KEYUP = 0x0002;
 
     [DllImport("user32.dll")]
@@ -45,6 +47,15 @@ internal static class Win32
     [DllImport("user32.dll")]
     private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
+    // Multi-monitor support
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    private const int SM_XVIRTUALSCREEN = 76;   // Left edge of virtual screen
+    private const int SM_YVIRTUALSCREEN = 77;   // Top edge of virtual screen  
+    private const int SM_CXVIRTUALSCREEN = 78;  // Width of virtual screen
+    private const int SM_CYVIRTUALSCREEN = 79;  // Height of virtual screen
+
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT { public uint type; public InputUnion U; }
 
@@ -61,12 +72,42 @@ internal static class Win32
     [StructLayout(LayoutKind.Sequential)]
     private struct KEYBDINPUT { public ushort wVk, wScan; public uint dwFlags, time; public IntPtr dwExtraInfo; }
 
+    /// <summary>
+    /// Clicks at the specified screen coordinates with multi-monitor support.
+    /// Coordinates are in virtual screen space (can be negative for monitors left of primary).
+    /// </summary>
     public static void Click(int x, int y)
     {
-        SetCursorPos(x, y);
+        // Get virtual screen bounds (handles multi-monitor setups)
+        int vsLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        int vsTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        int vsWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        int vsHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+        // Convert screen coordinates to normalized absolute coordinates (0-65535 range)
+        // relative to the virtual desktop (all monitors combined)
+        int normalizedX = (int)(((x - vsLeft) * 65535.0) / vsWidth);
+        int normalizedY = (int)(((y - vsTop) * 65535.0) / vsHeight);
+
         var inputs = new[]
         {
+            // Move mouse to absolute position on virtual desktop
+            new INPUT 
+            { 
+                type = INPUT_MOUSE, 
+                U = new InputUnion 
+                { 
+                    mi = new MOUSEINPUT 
+                    { 
+                        dx = normalizedX, 
+                        dy = normalizedY, 
+                        dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK 
+                    } 
+                } 
+            },
+            // Mouse down
             new INPUT { type = INPUT_MOUSE, U = new InputUnion { mi = new MOUSEINPUT { dwFlags = MOUSEEVENTF_LEFTDOWN } } },
+            // Mouse up
             new INPUT { type = INPUT_MOUSE, U = new InputUnion { mi = new MOUSEINPUT { dwFlags = MOUSEEVENTF_LEFTUP } } }
         };
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
