@@ -3,7 +3,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using IdolClick.Services;
-using WinForms = System.Windows.Forms;
 
 namespace IdolClick.UI;
 
@@ -26,15 +25,11 @@ public partial class RegionSelectorOverlay : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // Ensure full screen coverage
-        var screen = WinForms.Screen.PrimaryScreen;
-        if (screen != null)
-        {
-            Left = screen.Bounds.Left;
-            Top = screen.Bounds.Top;
-            Width = screen.Bounds.Width;
-            Height = screen.Bounds.Height;
-        }
+        // Ensure full virtual screen coverage (multi-monitor support)
+        Left = SystemParameters.VirtualScreenLeft;
+        Top = SystemParameters.VirtualScreenTop;
+        Width = SystemParameters.VirtualScreenWidth;
+        Height = SystemParameters.VirtualScreenHeight;
 
         Activate();
         Focus();

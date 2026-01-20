@@ -43,7 +43,6 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
     <PackageReference Include="System.Windows.Extensions" Version="8.0.0" />
     <!-- PowerShell executed via process spawn - no SDK needed, saves ~80MB -->
     <Reference Include="UIAutomationClient">

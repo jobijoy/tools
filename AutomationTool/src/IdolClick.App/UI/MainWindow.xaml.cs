@@ -35,7 +35,7 @@ public partial class MainWindow : Window
         ApplyViewMode();
 
         // Register hotkey
-        App.Tray.SetMainWindow(this);
+        App.Hotkey.SetMainWindow(this);
     }
 
     private void SetupKeyboardShortcuts()
@@ -555,13 +555,10 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
-        var cfg = App.Config.GetConfig();
-        if (cfg.Settings.MinimizeToTray)
-        {
-            e.Cancel = true;
-            Hide();
-            App.Tray.ShowBalloon("Idol Click", "Running in system tray. Press " + cfg.Settings.ToggleHotkey + " to toggle.");
-        }
+        // Normal window close - just minimize instead of closing app
+        // User can exit via Exit button or menu
+        e.Cancel = true;
+        WindowState = WindowState.Minimized;
     }
 
     // === Timeline Event Handlers ===

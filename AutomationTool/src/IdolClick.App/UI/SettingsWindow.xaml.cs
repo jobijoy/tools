@@ -24,7 +24,6 @@ public partial class SettingsWindow : Window
 
         HotkeyBox.Text = s.ToggleHotkey;
         LogLevelCombo.Text = s.LogLevel;
-        MinimizeToTrayCheck.IsChecked = s.MinimizeToTray;
         ShowPanelOnStartCheck.IsChecked = s.ShowPanelOnStart;
         MouseNudgeCheck.IsChecked = s.GlobalMouseNudge;
         ShowExecutionCountCheck.IsChecked = s.ShowExecutionCount;
@@ -77,7 +76,6 @@ public partial class SettingsWindow : Window
 
         s.ToggleHotkey = HotkeyBox.Text.Trim();
         s.LogLevel = (LogLevelCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Info";
-        s.MinimizeToTray = MinimizeToTrayCheck.IsChecked == true;
         s.ShowPanelOnStart = ShowPanelOnStartCheck.IsChecked == true;
         s.GlobalMouseNudge = MouseNudgeCheck.IsChecked == true;
         s.ShowExecutionCount = ShowExecutionCountCheck.IsChecked == true;

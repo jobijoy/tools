@@ -163,10 +163,9 @@ public class ConfigService
     {
         Settings = new GlobalSettings
         {
-            PollingIntervalMs = 3000,
+            PollingIntervalMs = 10000,
             AutomationEnabled = false,
             ShowPanelOnStart = true,
-            MinimizeToTray = true,
             ToggleHotkey = "Ctrl+Alt+T",
             LogLevel = "Info",
             Theme = "Dark"

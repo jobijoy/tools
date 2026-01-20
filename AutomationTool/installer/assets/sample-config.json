@@ -5,7 +5,6 @@
     "automationEnabled": true,
     "pollingIntervalMs": 10000,
     "showPanelOnStart": true,
-    "minimizeToTray": true,
     "toggleHotkey": "Ctrl+Alt+T",
     "logLevel": "Info",
     "theme": "Dark",

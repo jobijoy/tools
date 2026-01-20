@@ -51,11 +51,6 @@ public class GlobalSettings
     public bool ShowPanelOnStart { get; set; } = true;
     
     /// <summary>
-    /// Minimize to system tray instead of closing when the window close button is clicked.
-    /// </summary>
-    public bool MinimizeToTray { get; set; } = true;
-    
-    /// <summary>
     /// Periodically move the mouse to prevent system sleep.
     /// </summary>
     public bool GlobalMouseNudge { get; set; }

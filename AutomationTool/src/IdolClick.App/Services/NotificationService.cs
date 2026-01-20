@@ -56,9 +56,8 @@ public class NotificationService : INotificationService
     {
         try
         {
-            // Use the tray service to show balloon notification
-            App.Tray?.ShowBalloon(title, message);
-            _log.Debug("Notification", $"Toast sent: {title}");
+            // Log notification (tray removed - use Windows toast in future)
+            _log.Info("Notification", $"{title}: {message}");
             return true;
         }
         catch (Exception ex)

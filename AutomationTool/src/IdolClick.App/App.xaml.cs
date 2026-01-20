@@ -16,7 +16,7 @@ public partial class App : Application
     public static ConfigService Config { get; private set; } = null!;
     public static LogService Log { get; private set; } = null!;
     public static AutomationEngine Engine { get; private set; } = null!;
-    public static TrayService Tray { get; private set; } = null!;
+    public static HotkeyService Hotkey { get; private set; } = null!;
     public static IRegionCaptureService RegionCapture { get; private set; } = null!;
     public static INotificationService Notifications { get; private set; } = null!;
     public static IScriptExecutionService Scripts { get; private set; } = null!;
@@ -104,7 +104,7 @@ public partial class App : Application
                 Dispatcher.Invoke(() =>
                 {
                     Engine = new AutomationEngine(Config, Log);
-                    Tray = new TrayService();
+                    Hotkey = new HotkeyService();
                 });
                 
                 UpdateSplash("Starting up...", 1.0);
@@ -223,7 +223,7 @@ public partial class App : Application
         _showWindowEvent?.Dispose();
         
         Timeline?.Dispose();
-        Tray?.Dispose();
+        Hotkey?.Dispose();
         Engine?.Dispose();
         _mutex?.ReleaseMutex();
         _mutex?.Dispose();
