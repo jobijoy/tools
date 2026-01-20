@@ -42,6 +42,21 @@
       "action": "Click",
       "cooldownSeconds": 5,
       "dryRun": false
+    },
+    {
+      "id": "github-continue",
+      "name": "GitHub Continue Button",
+      "enabled": true,
+      "isRunning": true,
+      "targetApp": "",
+      "windowTitle": "Select an account",
+      "elementType": "Button",
+      "matchText": "Continue",
+      "useRegex": false,
+      "excludeTexts": [],
+      "action": "Click",
+      "cooldownSeconds": 5,
+      "dryRun": false
     }
   ]
 }
