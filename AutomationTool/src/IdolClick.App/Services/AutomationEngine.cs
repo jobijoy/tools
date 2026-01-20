@@ -158,7 +158,13 @@ public class AutomationEngine : IDisposable
 
         // Find target windows
         var windows = FindWindows(rule);
-        if (windows.Count == 0) return;
+        if (windows.Count == 0)
+        {
+            _log.Debug("Engine", $"Rule '{rule.Name}': No matching windows found");
+            return;
+        }
+        
+        _log.Debug("Engine", $"Rule '{rule.Name}': Found {windows.Count} windows");
 
         foreach (var window in windows)
         {
@@ -166,7 +172,11 @@ public class AutomationEngine : IDisposable
             if (rule.RequireFocus && !IsWindowFocused(window)) continue;
 
             var element = FindElement(window, rule);
-            if (element == null) continue;
+            if (element == null)
+            {
+                _log.Debug("Engine", $"Rule '{rule.Name}': No matching element in window");
+                continue;
+            }
 
             var elementName = element.Current.Name ?? "(unnamed)";
             _log.Debug("Match", $"Rule '{rule.Name}' matched: {elementName}");
@@ -265,33 +275,37 @@ public class AutomationEngine : IDisposable
         var results = new List<AutomationElement>();
         var seen = new HashSet<int>();
 
-        var processNames = rule.TargetApp.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-
-        foreach (var procName in processNames)
+        // Search by process name if specified
+        if (!string.IsNullOrEmpty(rule.TargetApp))
         {
-            foreach (var proc in Process.GetProcessesByName(procName))
+            var processNames = rule.TargetApp.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var procName in processNames)
             {
-                if (proc.MainWindowHandle == IntPtr.Zero) continue;
-                var handle = proc.MainWindowHandle.ToInt32();
-                if (seen.Contains(handle)) continue;
-
-                try
+                foreach (var proc in Process.GetProcessesByName(procName))
                 {
-                    var elem = AutomationElement.FromHandle(proc.MainWindowHandle);
-                    var title = elem.Current.Name ?? "";
+                    if (proc.MainWindowHandle == IntPtr.Zero) continue;
+                    var handle = proc.MainWindowHandle.ToInt32();
+                    if (seen.Contains(handle)) continue;
 
-                    if (!string.IsNullOrEmpty(rule.WindowTitle) &&
-                        !title.Contains(rule.WindowTitle, StringComparison.OrdinalIgnoreCase))
-                        continue;
+                    try
+                    {
+                        var elem = AutomationElement.FromHandle(proc.MainWindowHandle);
+                        var title = elem.Current.Name ?? "";
 
-                    results.Add(elem);
-                    seen.Add(handle);
+                        if (!string.IsNullOrEmpty(rule.WindowTitle) &&
+                            !title.Contains(rule.WindowTitle, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        results.Add(elem);
+                        seen.Add(handle);
+                    }
+                    catch { }
                 }
-                catch { }
             }
         }
 
-        // Also search by window title
+        // Also search all top-level windows by title
         if (!string.IsNullOrEmpty(rule.WindowTitle))
         {
             try
@@ -306,6 +320,7 @@ public class AutomationEngine : IDisposable
                     var title = w.Current.Name ?? "";
                     if (title.Contains(rule.WindowTitle, StringComparison.OrdinalIgnoreCase))
                     {
+                        _log.Debug("Window", $"Found window by title: '{title}'");
                         results.Add(w);
                         seen.Add(handle);
                     }
@@ -343,6 +358,25 @@ public class AutomationEngine : IDisposable
         var windowRect = window.Current.BoundingRectangle;
         var patterns = rule.MatchText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
+        _log.Debug("Element", $"Searching {elements.Count} elements for patterns: {rule.MatchText}");
+        
+        // Log first few elements for debugging
+        var logCount = 0;
+        for (int i = 0; i < elements.Count && logCount < 20; i++)
+        {
+            try
+            {
+                var e = elements[i];
+                var n = e.Current.Name ?? "";
+                if (!string.IsNullOrWhiteSpace(n))
+                {
+                    _log.Debug("Element", $"  [{e.Current.ControlType.ProgrammaticName}] '{n}'");
+                    logCount++;
+                }
+            }
+            catch { }
+        }
+
         for (int i = 0; i < elements.Count; i++)
         {
             var elem = elements[i];
@@ -368,6 +402,7 @@ public class AutomationEngine : IDisposable
             // Check enabled
             if (!elem.Current.IsEnabled) continue;
 
+            _log.Debug("Element", $"Found match: '{name}' type={elem.Current.ControlType.ProgrammaticName}");
             return elem;
         }
 
