@@ -1,34 +1,48 @@
 {
   "$schema": "https://raw.githubusercontent.com/jobijoy/tools/main/AutomationTool/schema/config-schema.json",
-  "SchemaVersion": 1,
-  "Settings": {
-    "Enabled": false,
-    "PollingIntervalMs": 1000,
-    "StartMinimized": true,
-    "MinimizeToTray": true,
-    "StartWithWindows": false,
-    "ToggleHotkey": "Ctrl+Alt+T",
-    "LogLevel": "Info",
-    "Theme": "Dark",
-    "ShowExecutionCount": true,
-    "EnableScripting": true,
-    "EnablePlugins": false
+  "schemaVersion": 1,
+  "settings": {
+    "automationEnabled": true,
+    "pollingIntervalMs": 1000,
+    "showPanelOnStart": true,
+    "minimizeToTray": true,
+    "toggleHotkey": "Ctrl+Alt+T",
+    "logLevel": "Info",
+    "theme": "Dark",
+    "showExecutionCount": true,
+    "scriptingEnabled": true,
+    "pluginsEnabled": false
   },
-  "Rules": [
+  "rules": [
     {
-      "Id": "example-vscode-allow",
-      "Name": "VS Code Allow Button",
-      "Enabled": false,
-      "IsRunning": false,
-      "TargetApp": "Code",
-      "WindowTitle": "",
-      "ElementType": "Button",
-      "MatchText": "Allow",
-      "UseRegex": false,
-      "ExcludeTexts": ["Don't Allow"],
-      "Action": "Click",
-      "CooldownSeconds": 2,
-      "DryRun": true
+      "id": "vscode-auto-click",
+      "name": "VS Code Auto-Click",
+      "enabled": true,
+      "isRunning": true,
+      "targetApp": "Code, Code - Insiders",
+      "windowTitle": "",
+      "elementType": "Button",
+      "matchText": "Allow, Continue, OK, Yes",
+      "useRegex": false,
+      "excludeTexts": ["Don't Allow", "Cancel"],
+      "action": "Click",
+      "cooldownSeconds": 2,
+      "dryRun": false
+    },
+    {
+      "id": "github-select-account",
+      "name": "GitHub Select Account",
+      "enabled": true,
+      "isRunning": true,
+      "targetApp": "Code, Code - Insiders",
+      "windowTitle": "Select an account",
+      "elementType": "ListItem",
+      "matchText": "jobijoy",
+      "useRegex": false,
+      "excludeTexts": [],
+      "action": "Click",
+      "cooldownSeconds": 2,
+      "dryRun": false
     }
   ]
 }

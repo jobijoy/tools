@@ -58,7 +58,10 @@ public partial class App : Application
                 UpdateSplash("Loading configuration...", 0.1);
                 await Task.Delay(150);
                 
-                var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+                // Use executable directory for config (works with single-file publish)
+                var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+                var appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
+                var configPath = Path.Combine(appDir, "config.json");
                 Config = new ConfigService(configPath);
                 
                 UpdateSplash("Starting log service...", 0.2);
