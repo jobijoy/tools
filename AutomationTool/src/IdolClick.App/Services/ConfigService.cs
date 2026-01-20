@@ -24,6 +24,11 @@ public class ConfigService
     private DateTime _lastModified;
     private readonly object _lock = new();
     
+    /// <summary>
+    /// Gets the path to the config file.
+    /// </summary>
+    public string ConfigPath => _configPath;
+    
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -75,6 +80,19 @@ public class ConfigService
             _config = config;
             _lastModified = DateTime.UtcNow;
         }
+    }
+
+    /// <summary>
+    /// Forces a reload of the configuration from disk.
+    /// </summary>
+    public void ReloadConfig()
+    {
+        lock (_lock)
+        {
+            _config = null;
+            _lastModified = DateTime.MinValue;
+        }
+        GetConfig(); // Trigger reload
     }
 
     private AppConfig Load()
@@ -174,15 +192,39 @@ public class ConfigService
         [
             new Rule
             {
-                Id = "vscode-allow",
-                Name = "VS Code Allow Button",
+                Id = "vscode-copilot-allow",
+                Name = "VS Code Copilot Allow/Continue",
                 Enabled = true,
                 TargetApp = "Code, Code - Insiders",
                 ElementType = "Button",
-                MatchText = "Allow, Continue, Yes, OK, Accept",
-                ExcludeTexts = ["Continue Chat in", "Continue in"],
+                MatchText = "Allow, Continue, OK, Yes",
+                ExcludeTexts = ["Don't Allow", "Cancel", "No", "Continue Chat", "Continue in"],
                 Action = "Click",
-                CooldownSeconds = 2
+                CooldownSeconds = 5
+            },
+            new Rule
+            {
+                Id = "github-select-jobijoy",
+                Name = "GitHub Select jobijoy Account",
+                Enabled = true,
+                TargetApp = "",
+                WindowTitle = "Select an account",
+                ElementType = "Any",
+                MatchText = "jobijoy",
+                Action = "Click",
+                CooldownSeconds = 5
+            },
+            new Rule
+            {
+                Id = "github-continue",
+                Name = "GitHub Continue Button",
+                Enabled = true,
+                TargetApp = "",
+                WindowTitle = "Select an account",
+                ElementType = "Button",
+                MatchText = "Continue",
+                Action = "Click",
+                CooldownSeconds = 5
             }
         ]
     };

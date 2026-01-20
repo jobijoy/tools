@@ -5,8 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Idol Click" 
-        Height="420" Width="610"
-        MinHeight="280" MinWidth="420"
+        Height="420" Width="770"
+        MinHeight="280" MinWidth="580"
         Background="{StaticResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/idol-click.png"
@@ -15,6 +15,10 @@
         StateChanged="Window_StateChanged">
 
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="ProfilePaneColumn" Width="180"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -23,8 +27,88 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Compact Header -->
-        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="12,10">
+        <!-- Profile Pane (Left) - Spans all rows -->
+        <Border x:Name="ProfilePane" Grid.Column="0" Grid.RowSpan="5" 
+                Background="{StaticResource CardBrush}" 
+                Visibility="Visible" Width="180">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Header -->
+                <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="14,12">
+                    <Grid>
+                        <TextBlock Text="Profiles" FontWeight="SemiBold" FontSize="13" 
+                                   Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                        <Button Content="✕" Style="{StaticResource SmallIconButton}" 
+                                HorizontalAlignment="Right" Click="HideProfilePane_Click"
+                                Width="22" Height="22" FontSize="11" Padding="0"
+                                ToolTip="Hide profile pane"/>
+                    </Grid>
+                </Border>
+                
+                <!-- Profile List -->
+                <ListBox x:Name="ProfileListBox" Grid.Row="1" 
+                         Background="Transparent" BorderThickness="0"
+                         Foreground="{StaticResource TextBrush}"
+                         SelectionChanged="ProfileListBox_SelectionChanged"
+                         FontSize="12" Padding="8,6">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="12,10"/>
+                            <Setter Property="Margin" Value="0,2"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" 
+                                                Padding="{TemplateBinding Padding}" CornerRadius="6">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                            </Trigger>
+                                            <MultiTrigger>
+                                                <MultiTrigger.Conditions>
+                                                    <Condition Property="IsMouseOver" Value="True"/>
+                                                    <Condition Property="IsSelected" Value="False"/>
+                                                </MultiTrigger.Conditions>
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                                            </MultiTrigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+                
+                <!-- Profile Buttons -->
+                <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" Padding="12,10">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="＋" Style="{StaticResource SmallPrimaryButton}" 
+                                Click="NewProfile_Click" ToolTip="New profile" 
+                                Width="32" Height="28" Padding="0" FontSize="14"/>
+                        <Button Content="📋" Style="{StaticResource SmallIconButton}" 
+                                Click="DuplicateProfile_Click" ToolTip="Duplicate profile" 
+                                Width="32" Height="28" Padding="0" Margin="6,0,0,0"/>
+                        <Button Content="✎" Style="{StaticResource SmallIconButton}" 
+                                Click="RenameProfile_Click" ToolTip="Rename profile" 
+                                Width="32" Height="28" Padding="0" Margin="6,0,0,0"/>
+                        <Button Content="🗑" Style="{StaticResource SmallDangerButton}" 
+                                Click="DeleteProfile_Click" ToolTip="Delete profile" 
+                                Width="32" Height="28" Padding="0" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Header -->
+        <Border Grid.Column="1" Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="16,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -41,6 +125,11 @@
 
                 <!-- Compact Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="ProfileToggleBtn" Content="📁" Width="32" Height="32" 
+                            Style="{StaticResource IconButton}" 
+                            Click="ToggleProfilePane_Click" 
+                            ToolTip="Show/hide profiles"/>
+                    
                     <ToggleButton x:Name="AutomationToggle" 
                                   Content="▶" 
                                   Width="32" Height="32" 
@@ -52,17 +141,12 @@
                             Style="{StaticResource IconButton}" 
                             Click="Settings_Click" 
                             ToolTip="Open settings"/>
-                    
-                    <Button Content="✕" Width="32" Height="32" Margin="6,0,0,0"
-                            Style="{StaticResource IconDangerButton}" 
-                            Click="Exit_Click" 
-                            ToolTip="Exit Idol Click"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Rules Panel -->
-        <Border Grid.Row="1" Margin="8,6,8,4" Background="{StaticResource SurfaceBrush}" CornerRadius="6">
+        <Border Grid.Column="1" Grid.Row="1" Margin="8,6,8,4" Background="{StaticResource SurfaceBrush}" CornerRadius="6">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -176,11 +260,11 @@
         </Border>
 
         <!-- Splitter (expanded mode only) -->
-        <GridSplitter x:Name="PanelSplitter" Grid.Row="2" Height="5" HorizontalAlignment="Stretch" 
+        <GridSplitter x:Name="PanelSplitter" Grid.Column="1" Grid.Row="2" Height="5" HorizontalAlignment="Stretch" 
                       Background="{StaticResource SurfaceBrush}" Visibility="Collapsed"/>
 
         <!-- Log & Details Panel (expanded mode only) -->
-        <Border x:Name="LogPanel" Grid.Row="3" Margin="8,2,8,6" Background="{StaticResource SurfaceBrush}" CornerRadius="6" Visibility="Collapsed">
+        <Border x:Name="LogPanel" Grid.Column="1" Grid.Row="3" Margin="8,2,8,6" Background="{StaticResource SurfaceBrush}" CornerRadius="6" Visibility="Collapsed">
             <TabControl x:Name="BottomTabs" Background="Transparent" BorderThickness="0" FontSize="11">
                 
                 <!-- Log Tab -->
@@ -301,17 +385,23 @@
             </TabControl>
         </Border>
 
-        <!-- Compact Footer -->
-        <Border Grid.Row="4" Background="{StaticResource SurfaceBrush}" Padding="10,4">
+        <!-- Footer -->
+        <Border Grid.Column="1" Grid.Row="4" Background="{StaticResource SurfaceBrush}" Padding="16,10">
             <Grid>
                 <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="ProfileIndicator" Text="Default" 
+                               Foreground="{StaticResource AccentBrush}" 
+                               FontSize="11" FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               ToolTip="Active profile"/>
+                    <TextBlock Text="  •  " Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center"/>
                     <TextBlock x:Name="HotkeyHint" Text="Ctrl+Alt+T" 
                                Foreground="{StaticResource TextSecondaryBrush}" 
-                               FontSize="10" 
+                               FontSize="11" 
                                VerticalAlignment="Center"/>
-                    <TextBlock x:Name="IntervalText" Text=" • 3s" 
+                    <TextBlock x:Name="IntervalText" Text="  •  10s" 
                                Foreground="{StaticResource TextSecondaryBrush}" 
-                               FontSize="10" 
+                               FontSize="11" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

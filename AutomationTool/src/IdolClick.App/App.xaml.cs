@@ -17,6 +17,7 @@ public partial class App : Application
     public static LogService Log { get; private set; } = null!;
     public static AutomationEngine Engine { get; private set; } = null!;
     public static HotkeyService Hotkey { get; private set; } = null!;
+    public static ProfileService Profiles { get; private set; } = null!;
     public static IRegionCaptureService RegionCapture { get; private set; } = null!;
     public static INotificationService Notifications { get; private set; } = null!;
     public static IScriptExecutionService Scripts { get; private set; } = null!;
@@ -63,6 +64,12 @@ public partial class App : Application
                 var appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
                 var configPath = Path.Combine(appDir, "config.json");
                 Config = new ConfigService(configPath);
+                
+                UpdateSplash("Loading profiles...", 0.15);
+                await Task.Delay(100);
+                
+                Log = new LogService(); // Temporary for ProfileService
+                Profiles = new ProfileService(Config, Log);
                 
                 UpdateSplash("Starting log service...", 0.2);
                 await Task.Delay(100);

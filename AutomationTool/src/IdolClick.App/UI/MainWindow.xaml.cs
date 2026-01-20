@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SetupKeyboardShortcuts();
+        LoadProfiles();
         LoadRules();
         SubscribeToLog();
         SetupStatusTimer();
@@ -33,6 +34,9 @@ public partial class MainWindow : Window
         LoadPlugins();
         LoadSettings();
         ApplyViewMode();
+
+        // Subscribe to profile changes
+        App.Profiles.ProfileChanged += OnProfileChanged;
 
         // Register hotkey
         App.Hotkey.SetMainWindow(this);
@@ -206,6 +210,236 @@ public partial class MainWindow : Window
         }
     }
 
+    // === Profile Management ===
+
+    private void LoadProfiles()
+    {
+        var profiles = App.Profiles.GetProfiles();
+        ProfileListBox.ItemsSource = profiles;
+        ProfileListBox.SelectedItem = App.Profiles.ActiveProfile;
+        ProfileIndicator.Text = App.Profiles.ActiveProfile;
+    }
+
+    private void OnProfileChanged()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            LoadRules();
+            LoadSettings();
+            ProfileIndicator.Text = App.Profiles.ActiveProfile;
+            ProfileListBox.SelectedItem = App.Profiles.ActiveProfile;
+            
+            // Restore automation state from the profile
+            var cfg = App.Config.GetConfig();
+            App.Engine.SetEnabled(cfg.Settings.AutomationEnabled);
+            AutomationToggle.IsChecked = cfg.Settings.AutomationEnabled;
+            UpdateToggleButton();
+            UpdateStatus();
+        });
+    }
+
+    private void ToggleProfilePane_Click(object sender, RoutedEventArgs e)
+    {
+        var isVisible = ProfilePane.Visibility == Visibility.Visible;
+        ProfilePane.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+        ProfilePaneColumn.Width = isVisible ? new GridLength(0) : new GridLength(180);
+    }
+
+    private void HideProfilePane_Click(object sender, RoutedEventArgs e)
+    {
+        ProfilePane.Visibility = Visibility.Collapsed;
+        ProfilePaneColumn.Width = new GridLength(0);
+    }
+
+    private void ProfileListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ProfileListBox.SelectedItem is string profileName)
+        {
+            if (profileName != App.Profiles.ActiveProfile)
+            {
+                App.Profiles.SwitchProfile(profileName);
+            }
+        }
+    }
+
+    private void NewProfile_Click(object sender, RoutedEventArgs e)
+    {
+        var name = PromptForName("New Profile", "Enter profile name:", "");
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            if (App.Profiles.CreateProfile(name))
+            {
+                App.Profiles.SwitchProfile(name);
+                LoadProfiles();
+            }
+            else
+            {
+                MessageBox.Show("Could not create profile. Name may already exist.", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+    }
+
+    private void DuplicateProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProfileListBox.SelectedItem is not string source) return;
+        
+        var name = PromptForName("Duplicate Profile", $"Enter name for copy of '{source}':", $"{source} Copy");
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            if (App.Profiles.DuplicateProfile(source, name))
+            {
+                // Switch to the new profile
+                App.Profiles.SwitchProfile(name);
+                LoadProfiles();
+            }
+            else
+            {
+                MessageBox.Show("Could not duplicate profile.", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+    }
+
+    private void RenameProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProfileListBox.SelectedItem is not string oldName) return;
+        if (oldName.Equals("Default", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Cannot rename the Default profile.", "Info", 
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        
+        var newName = PromptForName("Rename Profile", "Enter new name:", oldName);
+        if (!string.IsNullOrWhiteSpace(newName) && newName != oldName)
+        {
+            if (App.Profiles.RenameProfile(oldName, newName))
+            {
+                LoadProfiles();
+            }
+            else
+            {
+                MessageBox.Show("Could not rename profile.", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+    }
+
+    private void DeleteProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProfileListBox.SelectedItem is not string name) return;
+        if (name.Equals("Default", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Cannot delete the Default profile.", "Info", 
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        
+        var result = MessageBox.Show($"Delete profile '{name}'?\n\nThis cannot be undone.", "Confirm Delete",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        
+        if (result == MessageBoxResult.Yes)
+        {
+            if (App.Profiles.DeleteProfile(name))
+            {
+                LoadProfiles();
+            }
+        }
+    }
+
+    private static string? PromptForName(string title, string prompt, string defaultValue)
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 400,
+            Height = 180,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            ResizeMode = ResizeMode.NoResize,
+            Background = new SolidColorBrush(Color.FromRgb(32, 32, 32)),
+            WindowStyle = WindowStyle.ToolWindow,
+            Topmost = true
+        };
+
+        var border = new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.FromRgb(60, 60, 60)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Margin = new Thickness(20),
+            Padding = new Thickness(20)
+        };
+
+        var stack = new StackPanel();
+        var label = new TextBlock 
+        { 
+            Text = prompt, 
+            Foreground = new SolidColorBrush(Color.FromRgb(220, 220, 220)), 
+            FontSize = 14,
+            Margin = new Thickness(0, 0, 0, 12) 
+        };
+        var textBox = new TextBox 
+        { 
+            Text = defaultValue, 
+            Padding = new Thickness(12, 10, 12, 10),
+            FontSize = 14,
+            Background = new SolidColorBrush(Color.FromRgb(45, 45, 45)),
+            Foreground = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(80, 80, 80)),
+            BorderThickness = new Thickness(1)
+        };
+        textBox.SelectAll();
+        
+        var buttons = new StackPanel 
+        { 
+            Orientation = Orientation.Horizontal, 
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 20, 0, 0)
+        };
+        
+        var okButton = new Button 
+        { 
+            Content = "OK", 
+            Width = 90,
+            Height = 32,
+            FontSize = 13,
+            Background = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(0),
+            Cursor = Cursors.Hand,
+            IsDefault = true
+        };
+        var cancelButton = new Button 
+        { 
+            Content = "Cancel", 
+            Width = 90,
+            Height = 32,
+            FontSize = 13,
+            Background = new SolidColorBrush(Color.FromRgb(60, 60, 60)),
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(0),
+            Cursor = Cursors.Hand,
+            Margin = new Thickness(10, 0, 0, 0),
+            IsCancel = true
+        };
+
+        string? result = null;
+        okButton.Click += (s, e) => { result = textBox.Text; dialog.DialogResult = true; };
+        cancelButton.Click += (s, e) => dialog.DialogResult = false;
+
+        buttons.Children.Add(okButton);
+        buttons.Children.Add(cancelButton);
+        stack.Children.Add(label);
+        stack.Children.Add(textBox);
+        stack.Children.Add(buttons);
+        border.Child = stack;
+        dialog.Content = border;
+
+        textBox.Focus();
+        return dialog.ShowDialog() == true ? result : null;
+    }
+
     private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         _searchText = SearchTextBox.Text;
@@ -304,6 +538,7 @@ public partial class MainWindow : Window
         var cfg = App.Config.GetConfig();
         cfg.Settings.AutomationEnabled = enabled;
         App.Config.SaveConfig(cfg);
+        App.Profiles.SaveCurrentProfile();
 
         UpdateToggleButton();
         UpdateStatus();
@@ -331,6 +566,7 @@ public partial class MainWindow : Window
             var cfg = App.Config.GetConfig();
             cfg.Rules.Add(editor.Rule);
             App.Config.SaveConfig(cfg);
+            App.Profiles.SaveCurrentProfile();
             LoadRules();
         }
     }
@@ -358,6 +594,7 @@ public partial class MainWindow : Window
             {
                 cfg.Rules[idx] = editor.Rule;
                 App.Config.SaveConfig(cfg);
+                App.Profiles.SaveCurrentProfile();
                 LoadRules();
             }
         }
@@ -375,6 +612,7 @@ public partial class MainWindow : Window
                 var cfg = App.Config.GetConfig();
                 cfg.Rules.RemoveAll(r => r.Id == rule.Id);
                 App.Config.SaveConfig(cfg);
+                App.Profiles.SaveCurrentProfile();
                 LoadRules();
             }
         }
@@ -388,6 +626,7 @@ public partial class MainWindow : Window
             rule.NotifyEnabledChanged();
         }
         App.Config.SaveConfig(App.Config.GetConfig());
+        App.Profiles.SaveCurrentProfile();
         UpdateStatus();
     }
 
@@ -555,10 +794,11 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
-        // Normal window close - just minimize instead of closing app
-        // User can exit via Exit button or menu
-        e.Cancel = true;
-        WindowState = WindowState.Minimized;
+        // Save current profile state before exiting
+        App.Profiles.SaveCurrentProfile();
+        
+        // Exit the application
+        Application.Current.Shutdown();
     }
 
     // === Timeline Event Handlers ===
