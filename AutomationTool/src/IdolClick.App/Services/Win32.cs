@@ -23,15 +23,31 @@ internal static class Win32
     public const ushort VK_DOWN = 0x28;
     public const ushort VK_DELETE = 0x2E;
     public const ushort VK_BACK = 0x08;
+    public const ushort VK_LWIN = 0x5B;
+    public const ushort VK_RWIN = 0x5C;
+    public const ushort VK_F1 = 0x70;
+    public const ushort VK_F2 = 0x71;
+    public const ushort VK_F3 = 0x72;
+    public const ushort VK_F4 = 0x73;
+    public const ushort VK_F5 = 0x74;
+    public const ushort VK_F6 = 0x75;
+    public const ushort VK_F7 = 0x76;
+    public const ushort VK_F8 = 0x77;
+    public const ushort VK_F9 = 0x78;
+    public const ushort VK_F10 = 0x79;
+    public const ushort VK_F11 = 0x7A;
+    public const ushort VK_F12 = 0x7B;
 
     private const uint INPUT_MOUSE = 0;
     private const uint INPUT_KEYBOARD = 1;
     private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP = 0x0004;
+    private const uint MOUSEEVENTF_WHEEL = 0x0800;
     private const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
     private const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;  // For multi-monitor support
     private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint KEYEVENTF_UNICODE = 0x0004;
 
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -159,6 +175,21 @@ internal static class Win32
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
     }
 
+    /// <summary>
+    /// Sends a Unicode character via SendInput using KEYEVENTF_UNICODE.
+    /// Works for ALL characters including '.', '/', '@', ':', etc.
+    /// Unlike SendKey (VK codes), this sends the actual character code.
+    /// </summary>
+    public static void SendChar(char c)
+    {
+        var inputs = new[]
+        {
+            new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = new KEYBDINPUT { wScan = (ushort)c, dwFlags = KEYEVENTF_UNICODE } } },
+            new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = new KEYBDINPUT { wScan = (ushort)c, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP } } }
+        };
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+    }
+
     public static void SendKeyCombo(ushort[] modifiers, ushort mainKey)
     {
         var inputs = new List<INPUT>();
@@ -176,6 +207,26 @@ internal static class Win32
             inputs.Add(new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = new KEYBDINPUT { wVk = mod, dwFlags = KEYEVENTF_KEYUP } } });
 
         SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<INPUT>());
+    }
+
+    /// <summary>
+    /// Sends a mouse wheel event. Positive delta = scroll up, negative = scroll down.
+    /// Standard wheel click = 120 units.
+    /// </summary>
+    public static void MouseWheel(int delta)
+    {
+        var inputs = new[]
+        {
+            new INPUT
+            {
+                type = INPUT_MOUSE,
+                U = new InputUnion
+                {
+                    mi = new MOUSEINPUT { mouseData = unchecked((uint)delta), dwFlags = MOUSEEVENTF_WHEEL }
+                }
+            }
+        };
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

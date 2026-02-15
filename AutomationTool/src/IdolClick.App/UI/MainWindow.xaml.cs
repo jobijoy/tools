@@ -1,9 +1,11 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Text.Json;
+using Microsoft.Win32;
 using IdolClick.Models;
 using IdolClick.Services;
 
@@ -14,9 +16,12 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer _timer = null!;
     private int _actionCount;
     private LogLevel _logLevel = LogLevel.Info;
+    private LogLevel _agentLogLevel = LogLevel.Info;
     private List<Rule> _allRules = new();
     private string _searchText = "";
     private bool _isExpanded = false;
+    private AppMode _currentMode = AppMode.Classic;
+    private CancellationTokenSource? _chatCts;
     private const double CompactWidth = 420;
     private const double CompactHeight = 280;
     private const double ExpandedWidth = 900;
@@ -34,6 +39,7 @@ public partial class MainWindow : Window
         LoadPlugins();
         LoadSettings();
         ApplyViewMode();
+        ApplyMode(); // Set initial mode from config
 
         // Subscribe to profile changes
         App.Profiles.ProfileChanged += OnProfileChanged;
@@ -191,6 +197,7 @@ public partial class MainWindow : Window
     {
         var cfg = App.Config.GetConfig();
         AutomationToggle.IsChecked = cfg.Settings.AutomationEnabled;
+        _currentMode = cfg.Settings.Mode;
         UpdateToggleButton();
 
         // Set interval combo
@@ -503,6 +510,7 @@ public partial class MainWindow : Window
     private void SetupTimeline()
     {
         TimelineListView.ItemsSource = App.Timeline.Events;
+        AgentTimelineListView.ItemsSource = App.Timeline.Events;
     }
 
     private void SubscribeToLog()
@@ -550,6 +558,21 @@ public partial class MainWindow : Window
 
         while (LogListBox.Items.Count > 500)
             LogListBox.Items.RemoveAt(0);
+
+        // Also feed Agent-side log panel with level filtering
+        if (entry.Level >= _agentLogLevel)
+        {
+            var agentItem = new ListBoxItem
+            {
+                Content = $"[{entry.Time:HH:mm:ss}] {icon} [{entry.Category}] {entry.Message}",
+                Foreground = item.Foreground
+            };
+            AgentLogListBox.Items.Add(agentItem);
+            AgentLogListBox.ScrollIntoView(agentItem);
+
+            while (AgentLogListBox.Items.Count > 500)
+                AgentLogListBox.Items.RemoveAt(0);
+        }
     }
 
     private void SetupStatusTimer()
@@ -835,6 +858,55 @@ public partial class MainWindow : Window
         LogListBox.Items.Clear();
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // AGENT SIDE LOG PANEL
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    private void AgentLogLevel_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (AgentLogLevelCombo.SelectedItem is ComboBoxItem item)
+        {
+            _agentLogLevel = item.Content?.ToString() switch
+            {
+                "Debug" => LogLevel.Debug,
+                "Info" => LogLevel.Info,
+                "Warning" => LogLevel.Warning,
+                "Error" => LogLevel.Error,
+                _ => LogLevel.Info
+            };
+        }
+    }
+
+    private void ClearAgentLog_Click(object sender, RoutedEventArgs e)
+    {
+        AgentLogListBox.Items.Clear();
+    }
+
+    private void ToggleAgentLog_Click(object sender, RoutedEventArgs e)
+    {
+        var isVisible = AgentLogPanelCol.Width.Value > 0;
+        if (isVisible)
+        {
+            AgentLogPanelCol.Width = new GridLength(0);
+            AgentLogPanelCol.MinWidth = 0;
+            AgentLogSplitter.Visibility = Visibility.Collapsed;
+            AgentLogPanel.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            AgentLogPanelCol.Width = new GridLength(350);
+            AgentLogPanelCol.MinWidth = 200;
+            AgentLogSplitter.Visibility = Visibility.Visible;
+            AgentLogPanel.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void AgentTimelineFilter_Changed(object sender, SelectionChangedEventArgs e) { }
+    private void ClearAgentTimeline_Click(object sender, RoutedEventArgs e)
+    {
+        AgentTimelineListView.Items.Clear();
+    }
+
     private void OpenLogFile_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -934,6 +1006,689 @@ public partial class MainWindow : Window
             AutomationToggle.IsChecked = !AutomationToggle.IsChecked;
             AutomationToggle_Click(AutomationToggle, new RoutedEventArgs());
         });
+    }
+
+    // === Mode Switching ===
+
+    private void ClassicMode_Click(object sender, RoutedEventArgs e) => SwitchMode(AppMode.Classic);
+    private void AgentMode_Click(object sender, RoutedEventArgs e) => SwitchMode(AppMode.Agent);
+
+    private void SwitchMode(AppMode mode)
+    {
+        if (_currentMode == mode) return;
+        _currentMode = mode;
+
+        // Persist to config
+        var cfg = App.Config.GetConfig();
+        cfg.Settings.Mode = mode;
+        App.Config.SaveConfig(cfg);
+
+        ApplyMode();
+        App.Log.Info("Mode", $"Switched to {mode} mode");
+    }
+
+    private void ApplyMode()
+    {
+        var isAgent = _currentMode == AppMode.Agent;
+
+        // Toggle button styles
+        ClassicModeBtn.Style = (Style)FindResource(isAgent ? "ModeToggleInactive" : "ModeToggleActive");
+        AgentModeBtn.Style = (Style)FindResource(isAgent ? "ModeToggleActive" : "ModeToggleInactive");
+
+        // Toggle panels
+        RulesPanel.Visibility = isAgent ? Visibility.Collapsed : Visibility.Visible;
+        AgentChatPanel.Visibility = isAgent ? Visibility.Visible : Visibility.Collapsed;
+
+        // In Agent mode, hide the classic bottom log panel (agent has its own side panel)
+        if (isAgent)
+        {
+            LogPanel.Visibility = Visibility.Collapsed;
+            PanelSplitter.Visibility = Visibility.Collapsed;
+            LogPanelRow.Height = new GridLength(0);
+            LogPanelRow.MinHeight = 0;
+            SplitterRow.Height = new GridLength(0);
+        }
+        else if (_isExpanded)
+        {
+            LogPanel.Visibility = Visibility.Visible;
+            PanelSplitter.Visibility = Visibility.Visible;
+            LogPanelRow.Height = new GridLength(1, GridUnitType.Star);
+            LogPanelRow.MinHeight = 150;
+        }
+
+        // Show/hide classic-only controls
+        AutomationToggle.Visibility = isAgent ? Visibility.Collapsed : Visibility.Visible;
+
+        // Update agent status
+        if (isAgent)
+            UpdateAgentStatus();
+    }
+
+    private void UpdateAgentStatus()
+    {
+        var agent = App.Agent;
+        if (agent == null) return;
+        AgentStatusText.Text = $"  \u2022  {agent.StatusText}";
+    }
+
+    // === Agent Chat Handlers ===
+
+    private void ChatSend_Click(object sender, RoutedEventArgs e) => SendChatMessage();
+
+    private void ChatInput_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                // Shift+Enter: insert newline
+                var caretIndex = ChatInputBox.CaretIndex;
+                ChatInputBox.Text = ChatInputBox.Text.Insert(caretIndex, Environment.NewLine);
+                ChatInputBox.CaretIndex = caretIndex + Environment.NewLine.Length;
+                e.Handled = true;
+            }
+            else if (!string.IsNullOrWhiteSpace(ChatInputBox.Text))
+            {
+                // Enter alone: send
+                SendChatMessage();
+                e.Handled = true;
+            }
+        }
+    }
+
+    private void ChatInput_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ChatSendBtn.IsEnabled = !string.IsNullOrWhiteSpace(ChatInputBox.Text);
+    }
+
+    private async void SendChatMessage()
+    {
+        var text = ChatInputBox.Text?.Trim();
+        if (string.IsNullOrEmpty(text)) return;
+
+        // Add user message to chat
+        AddChatMessage(text, isUser: true);
+        ChatInputBox.Text = "";
+        ChatSendBtn.IsEnabled = false;
+        ChatInputBox.IsEnabled = false;
+
+        // Hide welcome panel once user sends a message
+        AgentWelcomePanel.Visibility = Visibility.Collapsed;
+
+        // Show typing indicator (we'll update this dynamically with progress)
+        var typingBubble = AddChatMessage("\u2219\u2219\u2219 thinking", isUser: false);
+        var typingTextBlock = typingBubble.Child as TextBlock;
+
+        // Cancel any previous in-flight request
+        _chatCts?.Cancel();
+        _chatCts = new CancellationTokenSource();
+
+        // Track intermediate text messages shown during tool calls
+        var intermediateMessages = new List<Border>();
+
+        // Subscribe to progress events for live status updates
+        void OnProgress(AgentProgress progress)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                switch (progress.Kind)
+                {
+                    case AgentProgressKind.IntermediateText:
+                        // LLM produced text before tool calls — show it as a real message
+                        if (!string.IsNullOrWhiteSpace(progress.IntermediateText))
+                        {
+                            var msg = AddChatMessage(progress.IntermediateText, isUser: false);
+                            intermediateMessages.Add(msg);
+                        }
+                        break;
+
+                    case AgentProgressKind.ToolCallStarting:
+                        // Update the typing bubble with tool name
+                        if (typingTextBlock != null)
+                            typingTextBlock.Text = progress.Message;
+                        break;
+
+                    case AgentProgressKind.ToolCallCompleted:
+                        // Brief flash of completion (will be overwritten by next tool or "Analyzing")
+                        if (typingTextBlock != null)
+                            typingTextBlock.Text = progress.Message;
+                        break;
+
+                    case AgentProgressKind.NewIteration:
+                        if (typingTextBlock != null)
+                            typingTextBlock.Text = progress.Message;
+                        break;
+                }
+
+                ChatScrollViewer.ScrollToEnd();
+            });
+        }
+
+        App.Agent.OnProgress += OnProgress;
+
+        try
+        {
+            var response = await App.Agent.SendMessageAsync(text, _chatCts.Token);
+
+            // Remove typing indicator
+            ChatMessagesPanel.Children.Remove(typingBubble);
+
+            // Show the final response
+            AddChatMessage(response.Text, isUser: false, isError: response.IsError);
+
+            // If response contains a test flow, show a run button
+            if (response.HasFlow)
+            {
+                AddFlowActionBar(response.Flow!);
+            }
+
+            UpdateAgentStatus();
+        }
+        catch (OperationCanceledException)
+        {
+            ChatMessagesPanel.Children.Remove(typingBubble);
+        }
+        catch (Exception ex)
+        {
+            ChatMessagesPanel.Children.Remove(typingBubble);
+            AddChatMessage($"Unexpected error: {ex.Message}", isUser: false, isError: true);
+        }
+        finally
+        {
+            App.Agent.OnProgress -= OnProgress;
+            ChatInputBox.IsEnabled = true;
+            ChatInputBox.Focus();
+        }
+    }
+
+    private Border AddChatMessage(string text, bool isUser, bool isError = false)
+    {
+        var bgColor = isUser
+            ? Color.FromRgb(0, 120, 212)    // PrimaryColor
+            : isError
+                ? Color.FromRgb(80, 30, 30) // Error tint
+                : Color.FromRgb(54, 54, 54);  // CardColor
+
+        var bubble = new Border
+        {
+            Background = new SolidColorBrush(bgColor),
+            CornerRadius = new CornerRadius(12, 12, isUser ? 2 : 12, isUser ? 12 : 2),
+            Padding = new Thickness(12, 8, 12, 8),
+            Margin = new Thickness(isUser ? 60 : 0, 2, isUser ? 0 : 60, 2),
+            HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+            MaxWidth = 500
+        };
+
+        if (isUser)
+        {
+            // User messages: plain text
+            bubble.Child = new TextBlock
+            {
+                Text = text,
+                Foreground = Brushes.White,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap
+            };
+        }
+        else
+        {
+            // Assistant messages: render with basic markdown + clickable paths
+            bubble.Child = RenderMarkdownContent(text, isError);
+        }
+
+        ChatMessagesPanel.Children.Add(bubble);
+        ChatScrollViewer.ScrollToEnd();
+        return bubble;
+    }
+
+    /// <summary>
+    /// Renders assistant message text with basic markdown support:
+    /// - **bold** text
+    /// - ## headings
+    /// - Bullet points (-, •)
+    /// - Clickable file paths (opens in explorer / default viewer)
+    /// - Inline screenshot thumbnails
+    /// </summary>
+    private UIElement RenderMarkdownContent(string text, bool isError)
+    {
+        var panel = new StackPanel();
+        var lines = text.Split('\n');
+        var defaultFg = isError ? Brushes.Salmon : Brushes.White;
+        var mutedFg = new SolidColorBrush(Color.FromRgb(170, 170, 170));
+        var accentFg = new SolidColorBrush(Color.FromRgb(16, 185, 129));
+        var headingFg = new SolidColorBrush(Color.FromRgb(100, 200, 255));
+
+        // Track last mentioned directory so bare filenames can be resolved
+        string? lastDirPath = null;
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine;
+
+            // Skip code fence markers
+            if (line.TrimStart().StartsWith("```")) continue;
+
+            // Track directory paths mentioned in the text (e.g. C:\path\to\folder\)
+            var dirMatch = System.Text.RegularExpressions.Regex.Match(line,
+                @"([A-Za-z]:\\[^'\""*<>|]+\\)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (dirMatch.Success)
+            {
+                var candidate = dirMatch.Value.TrimEnd('\'', '`', ' ');
+                if (System.IO.Directory.Exists(candidate))
+                    lastDirPath = candidate;
+            }
+
+            // Heading (## or ###)
+            if (line.TrimStart().StartsWith("##"))
+            {
+                var headingText = line.TrimStart('#', ' ');
+                panel.Children.Add(new TextBlock
+                {
+                    Text = headingText,
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = headingFg,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 4, 0, 2)
+                });
+                continue;
+            }
+
+            // Check for full file paths (e.g. C:\path\file.png)
+            var pathMatch = System.Text.RegularExpressions.Regex.Match(line,
+                @"([A-Za-z]:\\[^'\""\s*<>|]+\.(png|jpg|jpeg|bmp|json|txt|log))",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Also check for bare filenames (e.g. 'screenshot_xxx.png')
+            string? filePath = null;
+            if (pathMatch.Success)
+            {
+                filePath = pathMatch.Value.TrimEnd('\'', '`', '*');
+            }
+            else
+            {
+                var bareMatch = System.Text.RegularExpressions.Regex.Match(line,
+                    @"['\x22`]?([\w\-]+\.(png|jpg|jpeg|bmp|json|txt|log))['\x22`]?",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (bareMatch.Success)
+                {
+                    var bareName = bareMatch.Groups[1].Value;
+                    // Try to resolve using last known directory
+                    if (lastDirPath != null)
+                    {
+                        var fullPath = System.IO.Path.Combine(lastDirPath, bareName);
+                        if (System.IO.File.Exists(fullPath))
+                            filePath = fullPath;
+                    }
+                    // If not found, search in report screenshots folder
+                    if (filePath == null)
+                    {
+                        var screenshotsDir = System.IO.Path.Combine(
+                            AppDomain.CurrentDomain.BaseDirectory, "reports", "_screenshots");
+                        if (System.IO.Directory.Exists(screenshotsDir))
+                        {
+                            var found = System.IO.Path.Combine(screenshotsDir, bareName);
+                            if (System.IO.File.Exists(found))
+                                filePath = found;
+                        }
+                    }
+                }
+            }
+
+            if (filePath != null)
+            {
+                var isImage = filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                              filePath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                              filePath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                              filePath.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase);
+
+                // Add the text line with clickable path
+                var inlineTb = BuildInlineTextBlock(line, filePath, defaultFg, accentFg);
+                panel.Children.Add(inlineTb);
+
+                // Add inline thumbnail for images
+                if (isImage && System.IO.File.Exists(filePath))
+                {
+                    try
+                    {
+                        var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                        bitmap.BeginInit();
+                        bitmap.UriSource = new Uri(filePath);
+                        bitmap.DecodePixelWidth = 400;
+                        bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bitmap.EndInit();
+                        bitmap.Freeze();
+
+                        var img = new System.Windows.Controls.Image
+                        {
+                            Source = bitmap,
+                            MaxWidth = 400,
+                            MaxHeight = 250,
+                            Stretch = System.Windows.Media.Stretch.Uniform,
+                            Margin = new Thickness(0, 4, 0, 4),
+                            Cursor = Cursors.Hand,
+                            ToolTip = "Click to open full image"
+                        };
+                        var capturedPath = filePath;
+                        img.MouseLeftButtonUp += (s, e) =>
+                        {
+                            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(capturedPath) { UseShellExecute = true }); }
+                            catch { }
+                        };
+
+                        var imgBorder = new Border
+                        {
+                            CornerRadius = new CornerRadius(6),
+                            ClipToBounds = true,
+                            Child = img,
+                            Margin = new Thickness(0, 2, 0, 2)
+                        };
+                        panel.Children.Add(imgBorder);
+                    }
+                    catch { /* Ignore image load errors */ }
+                }
+                continue;
+            }
+
+            // Regular line — parse inline bold (**text**)
+            var tb = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                Margin = new Thickness(0, 1, 0, 1)
+            };
+
+            // Bullet points
+            bool isBullet = line.TrimStart().StartsWith("- ") || line.TrimStart().StartsWith("• ");
+            if (isBullet)
+            {
+                line = "  \u2022 " + line.TrimStart('-', '•', ' ');
+            }
+
+            // Parse **bold** segments
+            var parts = System.Text.RegularExpressions.Regex.Split(line, @"(\*\*.*?\*\*)");
+            foreach (var part in parts)
+            {
+                if (part.StartsWith("**") && part.EndsWith("**") && part.Length > 4)
+                {
+                    tb.Inlines.Add(new System.Windows.Documents.Run(part[2..^2])
+                    {
+                        FontWeight = FontWeights.Bold,
+                        Foreground = defaultFg
+                    });
+                }
+                else
+                {
+                    tb.Inlines.Add(new System.Windows.Documents.Run(part)
+                    {
+                        Foreground = defaultFg
+                    });
+                }
+            }
+
+            panel.Children.Add(tb);
+        }
+
+        return panel;
+    }
+
+    /// <summary>
+    /// Builds a TextBlock with a clickable file path hyperlink.
+    /// </summary>
+    private static TextBlock BuildInlineTextBlock(string line, string filePath, Brush defaultFg, Brush linkFg)
+    {
+        var tb = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 12,
+            Margin = new Thickness(0, 1, 0, 1)
+        };
+
+        // Try to find the full path in the line, or fall back to just the filename
+        var fileName = System.IO.Path.GetFileName(filePath);
+        var idx = line.IndexOf(filePath, StringComparison.OrdinalIgnoreCase);
+        var matchedText = filePath;
+        if (idx < 0)
+        {
+            idx = line.IndexOf(fileName, StringComparison.OrdinalIgnoreCase);
+            matchedText = fileName;
+        }
+
+        if (idx >= 0)
+        {
+            // Text before path
+            if (idx > 0)
+            {
+                var before = line[..idx].TrimEnd('\'', '`', ' ');
+                if (!string.IsNullOrWhiteSpace(before))
+                    tb.Inlines.Add(new System.Windows.Documents.Run(before + " ") { Foreground = defaultFg });
+            }
+
+            // Clickable path — show filename, tooltip shows full path
+            var link = new System.Windows.Documents.Hyperlink(
+                new System.Windows.Documents.Run(fileName))
+            {
+                Foreground = linkFg,
+                TextDecorations = null,
+                Cursor = Cursors.Hand
+            };
+            link.ToolTip = filePath;
+            var captured = filePath;
+            link.Click += (s, e) =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(captured) { UseShellExecute = true }); }
+                catch { }
+            };
+            tb.Inlines.Add(link);
+
+            // Text after the matched portion
+            var afterIdx = idx + matchedText.Length;
+            if (afterIdx < line.Length)
+            {
+                var after = line[afterIdx..].TrimStart('\'', '`');
+                if (!string.IsNullOrWhiteSpace(after))
+                    tb.Inlines.Add(new System.Windows.Documents.Run(after) { Foreground = defaultFg });
+            }
+        }
+        else
+        {
+            tb.Inlines.Add(new System.Windows.Documents.Run(line) { Foreground = defaultFg });
+        }
+
+        return tb;
+    }
+
+    /// <summary>
+    /// Adds a compact action bar below a test flow response, allowing the user to run or copy it.
+    /// </summary>
+    private void AddFlowActionBar(Models.TestFlow flow)
+    {
+        var bar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 2, 60, 4),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+
+        var runBtn = new Button
+        {
+            Content = $"\u25B6 Run '{flow.TestName}' ({flow.Steps.Count} steps)",
+            FontSize = 11,
+            Padding = new Thickness(10, 4, 10, 4),
+            Cursor = Cursors.Hand,
+            Background = new SolidColorBrush(Color.FromRgb(16, 185, 129)),  // AccentColor
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(0)
+        };
+        runBtn.Click += async (s, e) =>
+        {
+            runBtn.IsEnabled = false;
+            runBtn.Content = "\u23f3 Running...";
+            App.Log.Info("Agent", $"Executing flow '{flow.TestName}' ({flow.Steps.Count} steps)");
+
+            try
+            {
+                var report = await Task.Run(() => App.FlowExecutor.ExecuteFlowAsync(flow,
+                    onStepComplete: (step, total, result) =>
+                    {
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            var icon = result.Status == Models.StepStatus.Passed ? "\u2705" :
+                                       result.Status == Models.StepStatus.Failed ? "\u274c" :
+                                       result.Status == Models.StepStatus.Skipped ? "\u23ed" : "\u26a0";
+                            runBtn.Content = $"{icon} Step {step}/{total}: {result.Action} ({result.TimeMs}ms)";
+                        });
+                    }));
+
+                // Auto-save report to disk
+                string? savedPath = null;
+                try { savedPath = App.Reports?.SaveReport(report); } catch { }
+
+                // Show report in chat
+                var icon2 = report.Result == "passed" ? "\u2705" : "\u274c";
+                var reportJson = System.Text.Json.JsonSerializer.Serialize(report, Models.FlowJson.Options);
+                var savedMsg = savedPath != null ? $"\n📁 Report saved: {savedPath}" : "";
+                AddChatMessage(
+                    $"{icon2} **{report.Result.ToUpperInvariant()}** — {report.PassedCount} passed, {report.FailedCount} failed, {report.SkippedCount} skipped ({report.TotalTimeMs}ms){savedMsg}\n\n" +
+                    $"```json\n{reportJson}\n```",
+                    isUser: false);
+            }
+            catch (Exception ex)
+            {
+                AddChatMessage($"\u274c Flow execution error: {ex.Message}", isUser: false);
+                App.Log.Error("Agent", $"Flow execution failed: {ex.Message}");
+            }
+            finally
+            {
+                runBtn.Content = $"\u25B6 Run '{flow.TestName}' ({flow.Steps.Count} steps)";
+                runBtn.IsEnabled = true;
+            }
+        };
+
+        var copyBtn = new Button
+        {
+            Content = "\ud83d\udccb Copy JSON",
+            FontSize = 11,
+            Padding = new Thickness(8, 4, 8, 4),
+            Margin = new Thickness(6, 0, 0, 0),
+            Cursor = Cursors.Hand,
+            Background = new SolidColorBrush(Color.FromRgb(54, 54, 54)),
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(0)
+        };
+        copyBtn.Click += (s, e) =>
+        {
+            try
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(flow, Models.FlowJson.Options);
+                Clipboard.SetText(json);
+                App.Log.Info("Agent", $"Test flow '{flow.TestName}' copied to clipboard");
+            }
+            catch (Exception ex)
+            {
+                App.Log.Error("Agent", $"Failed to copy flow: {ex.Message}");
+            }
+        };
+
+        bar.Children.Add(runBtn);
+        bar.Children.Add(copyBtn);
+        ChatMessagesPanel.Children.Add(bar);
+        ChatScrollViewer.ScrollToEnd();
+    }
+
+    private void LoadFlow_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Load Test Flow",
+            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json"
+        };
+
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            var flow = ReportService.LoadFlowFromFile(dlg.FileName);
+            if (flow == null)
+            {
+                AddChatMessage("\u274c Could not parse flow from file. Ensure it's valid TestFlow JSON.", isUser: false);
+                return;
+            }
+
+            ImportFlow(flow, $"\ud83d\udcc2 Loaded from: {Path.GetFileName(dlg.FileName)}");
+        }
+        catch (Exception ex)
+        {
+            AddChatMessage($"\u274c Error loading flow: {ex.Message}", isUser: false);
+            App.Log.Error("Agent", $"Load flow failed: {ex.Message}");
+        }
+    }
+
+    private void PasteFlow_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var clipText = Clipboard.GetText();
+            if (string.IsNullOrWhiteSpace(clipText))
+            {
+                AddChatMessage("\u274c Clipboard is empty.", isUser: false);
+                return;
+            }
+
+            var flow = ReportService.ParseFlowFromJson(clipText);
+            if (flow == null)
+            {
+                AddChatMessage("\u274c Could not parse flow from clipboard. Ensure it's valid TestFlow JSON.", isUser: false);
+                return;
+            }
+
+            ImportFlow(flow, "\ud83d\udccb Pasted from clipboard");
+        }
+        catch (Exception ex)
+        {
+            AddChatMessage($"\u274c Error parsing clipboard flow: {ex.Message}", isUser: false);
+            App.Log.Error("Agent", $"Paste flow failed: {ex.Message}");
+        }
+    }
+
+    private void ImportFlow(TestFlow flow, string sourceLabel)
+    {
+        AgentWelcomePanel.Visibility = Visibility.Collapsed;
+
+        // Validate the flow
+        var validator = new FlowValidatorService(App.Log);
+        var result = validator.Validate(flow);
+
+        if (!result.IsValid)
+        {
+            var errors = string.Join("\n", result.Errors.Select(e => $"  \u2022 {e}"));
+            AddChatMessage(
+                $"{sourceLabel}\n\n\u26a0 **Validation failed** ({result.Errors.Count} errors):\n{errors}",
+                isUser: false);
+            return;
+        }
+
+        var warnings = result.Warnings.Count > 0
+            ? $"\n\u26a0 {result.Warnings.Count} warning(s)"
+            : "";
+
+        AddChatMessage(
+            $"{sourceLabel}\n\n\u2705 **{flow.TestName}** — {flow.Steps.Count} steps, validated OK{warnings}",
+            isUser: false);
+
+        AddFlowActionBar(flow);
+        App.Log.Info("Agent", $"Imported flow '{flow.TestName}' ({flow.Steps.Count} steps): {sourceLabel}");
+    }
+
+    private void ClearChat_Click(object sender, RoutedEventArgs e)
+    {
+        _chatCts?.Cancel();
+        ChatMessagesPanel.Children.Clear();
+        AgentWelcomePanel.Visibility = Visibility.Visible;
+        App.Agent?.ClearHistory();
+        UpdateAgentStatus();
     }
 }
 

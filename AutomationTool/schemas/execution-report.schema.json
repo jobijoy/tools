@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idolclick.dev/schemas/v1/execution-report.schema.json",
+  "title": "IdolClick Execution Report v1",
+  "description": "Machine-readable execution report produced after running a TestFlow. Designed for AI consumption — coding agents read this to determine what to fix.",
+  "type": "object",
+  "required": ["schemaVersion", "testName", "result", "steps", "startedAt", "finishedAt"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Report schema version. Must be 1."
+    },
+    "testName": {
+      "type": "string",
+      "description": "Name of the test flow that was executed."
+    },
+    "result": {
+      "type": "string",
+      "enum": ["passed", "failed", "error", "aborted"],
+      "description": "Overall execution result."
+    },
+    "failedStep": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "1-based index of the first failed step. Null if all passed."
+    },
+    "totalTimeMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total execution time in milliseconds."
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when execution started."
+    },
+    "finishedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when execution finished."
+    },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/StepResult" },
+      "description": "Per-step execution results."
+    },
+    "screenshots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Paths to screenshots captured during execution."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Human-readable summary of the execution."
+    },
+    "passedCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of steps that passed."
+    },
+    "failedCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of steps that failed."
+    },
+    "skippedCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of steps that were skipped."
+    },
+    "environment": {
+      "$ref": "#/$defs/ExecutionEnvironment",
+      "description": "Information about the execution environment."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "StepStatus": {
+      "type": "string",
+      "enum": ["passed", "failed", "skipped", "error"],
+      "description": "Execution status of a single step."
+    },
+    "StepAction": {
+      "type": "string",
+      "enum": [
+        "click", "type", "send_keys", "wait",
+        "assert_exists", "assert_not_exists", "assert_text", "assert_window",
+        "navigate", "screenshot", "scroll", "focus_window", "launch"
+      ]
+    },
+    "AssertionType": {
+      "type": "string",
+      "enum": ["exists", "not_exists", "text_contains", "text_equals", "window_title", "process_running"]
+    },
+    "ElementBounds": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" }
+      },
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": false
+    },
+    "ElementSnapshot": {
+      "type": "object",
+      "description": "Snapshot of the matched UI element at execution time.",
+      "properties": {
+        "controlType": {
+          "type": "string",
+          "description": "UI Automation control type (e.g., 'Button', 'TextBox')."
+        },
+        "name": {
+          "type": ["string", "null"],
+          "description": "Element name/text."
+        },
+        "automationId": {
+          "type": ["string", "null"],
+          "description": "Automation ID (stable identifier)."
+        },
+        "isEnabled": {
+          "type": "boolean",
+          "description": "Whether the element was enabled at interaction time."
+        },
+        "bounds": {
+          "$ref": "#/$defs/ElementBounds",
+          "description": "Screen-space bounding rectangle."
+        }
+      },
+      "required": ["controlType"],
+      "additionalProperties": false
+    },
+    "AssertionResult": {
+      "type": "object",
+      "description": "Result of evaluating a single post-step assertion.",
+      "properties": {
+        "type": { "$ref": "#/$defs/AssertionType" },
+        "passed": { "type": "boolean" },
+        "expected": { "type": ["string", "null"] },
+        "actual": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "error": { "type": ["string", "null"] }
+      },
+      "required": ["type", "passed"],
+      "additionalProperties": false
+    },
+    "StepResult": {
+      "type": "object",
+      "description": "Execution result for a single test step.",
+      "properties": {
+        "step": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based step number."
+        },
+        "action": { "$ref": "#/$defs/StepAction" },
+        "selector": {
+          "type": ["string", "null"],
+          "description": "The selector used, if any."
+        },
+        "description": {
+          "type": ["string", "null"],
+          "description": "Step description."
+        },
+        "status": { "$ref": "#/$defs/StepStatus" },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this step started."
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this step finished."
+        },
+        "timeMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Execution duration in milliseconds."
+        },
+        "retryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of retry attempts. 0 = first attempt."
+        },
+        "expected": {
+          "type": ["string", "null"],
+          "description": "Expected value (for assertions)."
+        },
+        "found": {
+          "type": ["string", "null"],
+          "description": "Actual value found."
+        },
+        "error": {
+          "type": ["string", "null"],
+          "description": "Error message if the step failed."
+        },
+        "screenshot": {
+          "type": ["string", "null"],
+          "description": "Path to screenshot taken at this step."
+        },
+        "diagnostics": {
+          "type": ["string", "null"],
+          "description": "Additional diagnostic details for AI consumption."
+        },
+        "element": {
+          "$ref": "#/$defs/ElementSnapshot",
+          "description": "Snapshot of the matched UI element."
+        },
+        "assertionResults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AssertionResult" },
+          "description": "Results of post-step assertions."
+        }
+      },
+      "required": ["step", "action", "status"],
+      "additionalProperties": false
+    },
+    "ExecutionEnvironment": {
+      "type": "object",
+      "description": "Execution environment metadata.",
+      "properties": {
+        "machineName": { "type": "string" },
+        "osVersion": { "type": "string" },
+        "idolClickVersion": { "type": "string" },
+        "screenResolution": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

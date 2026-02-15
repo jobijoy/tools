@@ -39,7 +39,9 @@ public class LogService
 {
     private readonly ConcurrentQueue<LogEntry> _buffer = new();
     private readonly string _logPath;
+    private readonly string _auditPath;
     private readonly object _fileLock = new();
+    private readonly object _auditLock = new();
     private LogLevel _minLevel = LogLevel.Info;
     
     /// <summary>
@@ -60,6 +62,7 @@ public class LogService
         var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
         Directory.CreateDirectory(logDir);
         _logPath = Path.Combine(logDir, $"log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+        _auditPath = Path.Combine(logDir, "audit_log.txt");
     }
 
     /// <summary>
@@ -80,6 +83,31 @@ public class LogService
     
     /// <summary>Logs an error message.</summary>
     public void Error(string category, string message) => Log(LogLevel.Error, category, message);
+
+    /// <summary>
+    /// Writes a safety audit entry. Always persists regardless of log level.
+    /// Written to a separate audit_log.txt for enterprise compliance.
+    /// Events: kill switch, target lock violations, allowlist blocks, vision fallback usage.
+    /// </summary>
+    public void Audit(string category, string message)
+    {
+        // Also log normally at Warning level
+        Warn(category, message);
+
+        // Write to dedicated audit log
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] AUDIT [{category,-15}] {message}";
+                lock (_auditLock)
+                {
+                    File.AppendAllText(_auditPath, line + Environment.NewLine);
+                }
+            }
+            catch { }
+        });
+    }
 
     /// <summary>
     /// Logs a message with the specified level and category.

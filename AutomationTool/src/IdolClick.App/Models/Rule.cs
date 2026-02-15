@@ -229,6 +229,12 @@ public class Rule : System.ComponentModel.INotifyPropertyChanged
     /// </summary>
     public bool DryRun { get; set; }
 
+    /// <summary>
+    /// Maximum number of times this rule can fire per session. 0 = unlimited.
+    /// Prevents runaway loops from misconfigured rules.
+    /// </summary>
+    public int MaxExecutionsPerSession { get; set; } = 0;
+
     // ═══════════════════════════════════════════════════════════════════════════
     // METADATA (Persisted)
     // ═══════════════════════════════════════════════════════════════════════════

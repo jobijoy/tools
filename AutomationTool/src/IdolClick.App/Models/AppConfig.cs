@@ -1,6 +1,17 @@
 namespace IdolClick.Models;
 
 /// <summary>
+/// Application operating mode.
+/// </summary>
+public enum AppMode
+{
+    /// <summary>Classic rule-based automation engine.</summary>
+    Classic,
+    /// <summary>AI agent mode with natural language interaction.</summary>
+    Agent
+}
+
+/// <summary>
 /// Root application configuration containing global settings and automation rules.
 /// Serialized to/from config.json in the application directory.
 /// </summary>
@@ -16,6 +27,11 @@ public class AppConfig
     public GlobalSettings Settings { get; set; } = new();
     
     /// <summary>
+    /// AI agent configuration for LLM-backed automation.
+    /// </summary>
+    public AgentSettings AgentSettings { get; set; } = new();
+    
+    /// <summary>
     /// Collection of automation rules to evaluate each polling cycle.
     /// </summary>
     public List<Rule> Rules { get; set; } = [];
@@ -26,6 +42,13 @@ public class AppConfig
 /// </summary>
 public class GlobalSettings
 {
+    // === Mode ===
+    
+    /// <summary>
+    /// Current application operating mode: Classic (rules) or Agent (AI).
+    /// </summary>
+    public AppMode Mode { get; set; } = AppMode.Classic;
+    
     // === Core Automation ===
     
     /// <summary>
@@ -127,6 +150,77 @@ public class GlobalSettings
     /// Default settings for notifications.
     /// </summary>
     public NotificationDefaults NotificationDefaults { get; set; } = new();
+
+    // === Safety ===
+
+    /// <summary>
+    /// Global kill switch hotkey (e.g., "Ctrl+Alt+Escape").
+    /// Immediately stops all automation (classic engine + running flows).
+    /// </summary>
+    public string KillSwitchHotkey { get; set; } = "Ctrl+Alt+Escape";
+
+    /// <summary>
+    /// Process allowlist. When non-empty, automation ONLY targets these processes.
+    /// Both the classic engine and flow executor enforce this.
+    /// Empty list = no restriction (all processes allowed).
+    /// </summary>
+    public List<string> AllowedProcesses { get; set; } = [];
+}
+
+/// <summary>
+/// Settings for the AI agent backend (LLM endpoint, model, credentials).
+/// </summary>
+public class AgentSettings
+{
+    /// <summary>
+    /// LLM API endpoint URL (e.g., Azure OpenAI, GitHub Models, local Ollama).
+    /// </summary>
+    public string Endpoint { get; set; } = "";
+    
+    /// <summary>
+    /// Model deployment/ID to use (e.g., "gpt-4o", "gpt-4o-mini").
+    /// </summary>
+    public string ModelId { get; set; } = "gpt-4o";
+    
+    /// <summary>
+    /// API key for the LLM endpoint. Stored in config; future: encrypted via DPAPI.
+    /// </summary>
+    public string ApiKey { get; set; } = "";
+    
+    /// <summary>
+    /// Maximum tokens per LLM response.
+    /// </summary>
+    public int MaxTokens { get; set; } = 4096;
+    
+    /// <summary>
+    /// Sampling temperature. Set to 0 to omit (use model default).
+    /// Some models (e.g. o-series, gpt-5.2) only support the default value.
+    /// </summary>
+    public double Temperature { get; set; } = 0;
+    
+    /// <summary>
+    /// System prompt prepended to every agent conversation.
+    /// </summary>
+    public string SystemPrompt { get; set; } = "You are IdolClick Agent, a desktop automation assistant. You can create automation rules, click UI elements, type text, and inspect windows. Be concise and action-oriented.";
+
+    /// <summary>
+    /// Enable vision-based fallback for element location when UIA selectors fail.
+    /// Requires a vision-capable LLM (gpt-4o, claude-3.5-sonnet, gemini-pro-vision, etc.).
+    /// </summary>
+    public bool VisionFallbackEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Minimum confidence threshold (0.0–1.0) for vision results to be used.
+    /// Below this, the element is treated as "not found".
+    /// </summary>
+    public double VisionConfidenceThreshold { get; set; } = 0.7;
+
+    /// <summary>
+    /// Optional separate model ID for vision requests. If empty, uses the main ModelId.
+    /// Useful when the main model doesn't support vision (e.g., text-only) but you have
+    /// a vision model available at the same endpoint.
+    /// </summary>
+    public string VisionModelId { get; set; } = "";
 }
 
 /// <summary>

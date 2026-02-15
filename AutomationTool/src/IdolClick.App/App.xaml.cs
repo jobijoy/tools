@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Threading;
 using IdolClick.Services;
+using IdolClick.Services.Infrastructure;
 using IdolClick.UI;
 
 namespace IdolClick;
@@ -23,6 +24,24 @@ public partial class App : Application
     public static IScriptExecutionService Scripts { get; private set; } = null!;
     public static PluginService Plugins { get; private set; } = null!;
     public static EventTimelineService Timeline { get; private set; } = null!;
+    public static IAgentService Agent { get; private set; } = null!;
+    public static StepExecutor FlowExecutor { get; private set; } = null!;
+    public static IAutomationBackend DesktopBackend { get; private set; } = null!;
+    public static ReportService Reports { get; private set; } = null!;
+    public static VisionService Vision { get; private set; } = null!;
+
+    /// <summary>
+    /// When true, the kill switch has been activated and the engine cannot be
+    /// re-enabled until the user manually resets it from the UI.
+    /// Prevents restart loops after emergency stop.
+    /// </summary>
+    public static bool KillSwitchActive { get; private set; }
+
+    /// <summary>
+    /// Cancellation source for the currently running agent flow, if any.
+    /// Set by the agent chat panel when a flow starts; cancelled by kill switch.
+    /// </summary>
+    public static CancellationTokenSource? ActiveFlowCts { get; set; }
 
     private SplashWindow? _splash;
     private MainWindow? _mainWindow;
@@ -30,6 +49,26 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // ── CLI arg stubs (v1.1 will expand) ─────────────────────────────────
+        var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        if (args.Length > 0)
+        {
+            switch (args[0].ToLowerInvariant())
+            {
+                case "--version":
+                case "-v":
+                    ServiceHost.PrintVersion();
+                    Shutdown(0);
+                    return;
+                case "--help":
+                case "-h":
+                case "/?":
+                    ServiceHost.PrintHelp();
+                    Shutdown(0);
+                    return;
+            }
+        }
+
         // Single instance check
         _mutex = new Mutex(true, MutexName, out bool createdNew);
         
@@ -104,6 +143,32 @@ public partial class App : Application
                 
                 Timeline = new EventTimelineService(Log);
                 
+                UpdateSplash("Initializing agent service...", 0.8);
+                await Task.Delay(100);
+                
+                Agent = new AgentService(Config, Log);
+                
+                UpdateSplash("Initializing flow executor...", 0.82);
+                await Task.Delay(100);
+                
+                var flowValidator = new FlowValidatorService(Log);
+                var ruleExecutor = new ActionExecutor(Log);
+                var flowActionExecutor = new FlowActionExecutor(Log, ruleExecutor);
+                var assertionEvaluator = new AssertionEvaluator(Log);
+                var selectorParser = new SelectorParser(Log);
+                
+                // Vision service (fallback for UIA resolution failures)
+                Vision = new VisionService(Config, Log);
+                
+                DesktopBackend = new Services.Infrastructure.DesktopBackend(Log, flowActionExecutor, assertionEvaluator, selectorParser, Vision);
+                FlowExecutor = new StepExecutor(Log, flowValidator, DesktopBackend);
+                
+                Reports = new ReportService(Log);
+                
+                // Connect execution services to agent for closed-loop
+                if (Agent is AgentService agentSvc)
+                    agentSvc.SetExecutionServices(FlowExecutor, Reports, Vision);
+                
                 UpdateSplash("Initializing automation engine...", 0.85);
                 await Task.Delay(150);
                 
@@ -112,6 +177,15 @@ public partial class App : Application
                 {
                     Engine = new AutomationEngine(Config, Log);
                     Hotkey = new HotkeyService();
+
+                    // Wire kill switch — emergency stop for all automation
+                    Hotkey.OnKillSwitchActivated += () =>
+                    {
+                        KillSwitchActive = true;
+                        Engine.SetEnabled(false);
+                        ActiveFlowCts?.Cancel();
+                        Log.Audit("KillSwitch", "EMERGENCY STOP activated — all automation disabled until manual reset");
+                    };
                 });
                 
                 UpdateSplash("Starting up...", 1.0);
@@ -214,6 +288,16 @@ public partial class App : Application
         _mainWindow.Focus();
     }
 
+    /// <summary>
+    /// Resets the kill switch, allowing the engine to be re-enabled.
+    /// Called from the UI when the user explicitly acknowledges the emergency stop.
+    /// </summary>
+    public static void ResetKillSwitch()
+    {
+        KillSwitchActive = false;
+        Log.Audit("KillSwitch", "Kill switch reset by user — automation can be re-enabled");
+    }
+
     private void UpdateSplash(string status, double progress)
     {
         Dispatcher.Invoke(() => _splash?.UpdateStatus(status, progress));
@@ -229,6 +313,7 @@ public partial class App : Application
         _signalListenerThread?.Join(1000);
         _showWindowEvent?.Dispose();
         
+        (Agent as IDisposable)?.Dispose();
         Timeline?.Dispose();
         Hotkey?.Dispose();
         Engine?.Dispose();

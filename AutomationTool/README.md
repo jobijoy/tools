@@ -1,36 +1,41 @@
 # IdolClick
 
-> **IdolClick** – Smart Windows UI automation from your system tray
+> **AI-Compatible Deterministic UI Execution Runtime for Windows**
 
-Rule-based Windows UI automation. Auto-click buttons, send keys, run scripts when specific UI elements appear.
+Desktop UI automation with structured flows, safety guardrails, and AI agent integration. Rule-based or AI-driven — your choice.
 
-![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4) ![License](https://img.shields.io/badge/License-MIT-green)
+![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/v1.0.0-blue)
 
 <p align="center">
   <img src="src/IdolClick.App/Assets/idol-click.png" alt="IdolClick" width="150"/>
 </p>
 
+## What It Does
+
+| Mode | Description |
+|------|-------------|
+| **Classic** | Rule-based polling — auto-click, send keys, run scripts when UI elements match |
+| **Agent** | LLM chat with 9 tools — AI authors structured flows, executes them, reads reports, patches + retries |
+
+**For the full product narrative, architecture, and DSL specification, see [PRODUCT.md](PRODUCT.md).**
+
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| Rule-Based Automation | Match UI elements by app, text, regex, element type |
-| Visual Region Selector | Draw screen regions to target specific areas |
+| Structured Flows | JSON DSL with 13 actions, typed selectors, post-step assertions |
+| AI Agent Integration | Microsoft.Extensions.AI with function-calling (9 tools) |
+| Vision Fallback | Screenshot + LLM vision when UIA selectors fail (flagged as Warning) |
+| Safety Hardening | Kill switch, target lock, process allowlist, audit log |
+| Actionability Checks | Playwright-inspired pre-action validation (visible, enabled, stable) |
+| Execution Reports | Machine-readable JSON with timing, element snapshots, backend call log |
+| Rule Engine | Match UI elements by app, text, regex, region, element type |
 | Scripting | PowerShell & C# (Roslyn) with context variables |
 | Plugins | Extend with .NET DLLs or PowerShell scripts |
-| Notifications | Toast, webhook, or script hooks |
-| Safety | Cooldowns, time windows, dry-run, confirmations |
-| Single Instance | Only one instance runs at a time |
-
-## Preview
-
-<!-- Add screenshots here -->
-*Coming soon: Main window, tray icon, and rule editor screenshots*
 
 ## Quick Start
 
 ```powershell
-# Clone and run
 git clone https://github.com/jobijoy/tools.git
 cd tools/AutomationTool
 .\Start-IdolClick.ps1
@@ -42,8 +47,20 @@ cd tools/AutomationTool
 
 1. Launch app (runs in system tray)
 2. Click tray icon → **Show Panel**
-3. Add rules via **+ Add Rule**
+3. Choose mode: **Classic** (rules) or **Agent** (AI chat)
 4. Toggle automation with **Ctrl+Alt+T** or tray menu
+5. Emergency stop: **Ctrl+Alt+Escape** (kill switch)
+
+## Safety
+
+| Guardrail | Description |
+|-----------|-------------|
+| **Kill Switch** | `Ctrl+Alt+Escape` — instantly stops everything, requires manual reset |
+| **Target Lock** | Pin to specific window (HWND + PID); fail if focus shifts |
+| **Process Allowlist** | Only automate listed processes (wildcards supported) |
+| **Vision Warnings** | Vision-resolved steps are flagged, never silently promoted |
+| **Audit Log** | All safety events written to `logs/audit_log.txt` |
+| **Per-Rule Limits** | Cooldowns, time windows, max executions, dry-run, confirmations |
 
 ## 🔥 Hotkey Launching (Ctrl+Alt+T)
 
@@ -131,9 +148,11 @@ Output: `src/IdolClick.App/bin/Release/net8.0-windows/IdolClick.exe`
 dotnet publish -c Release -r win-x64 --self-contained false
 ```
 
-## Security & Privacy
+## Security & Safety
 
-> 🔐 **All UI actions are performed locally.** No data is sent externally. Rules only interact with windows you target. The application requires no network access and stores all configuration locally.
+> 🔐 **All UI actions are performed locally.** No data is sent externally unless you configure an LLM endpoint for Agent mode. Rules only interact with windows you target. Configuration is stored locally in `config.json`.
+
+> 🛡️ **Safety-first design.** Kill switch, target lock, process allowlist, and audit logging are built-in. See [PRODUCT.md](PRODUCT.md) for the full safety model.
 
 ## License
 

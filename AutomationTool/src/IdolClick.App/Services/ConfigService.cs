@@ -181,6 +181,7 @@ public class ConfigService
     {
         Settings = new GlobalSettings
         {
+            Mode = AppMode.Classic,
             AutomationEnabled = false,
             PollingIntervalMs = 3000,
             ToggleHotkey = "Ctrl+Alt+T",
@@ -202,6 +203,15 @@ public class ConfigService
                 ToastOnRuleMatch = false,
                 IncludeTimestamp = true
             }
+        },
+        AgentSettings = new AgentSettings
+        {
+            Endpoint = "",
+            ModelId = "gpt-4o",
+            ApiKey = "",
+            MaxTokens = 4096,
+            Temperature = 0,
+            SystemPrompt = "You are IdolClick Agent, a desktop automation assistant. You can create automation rules, click UI elements, type text, and inspect windows. Be concise and action-oriented."
         },
         Rules =
         [

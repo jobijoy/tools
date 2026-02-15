@@ -337,8 +337,8 @@ public class ActionExecutor
             return;
         }
 
-        // Handle Ctrl+X, Alt+X combinations
-        if (lower.StartsWith("ctrl+") || lower.StartsWith("alt+") || lower.StartsWith("shift+"))
+        // Handle Ctrl+X, Alt+X, Shift+X, Win+X combinations
+        if (lower.StartsWith("ctrl+") || lower.StartsWith("alt+") || lower.StartsWith("shift+") || lower.StartsWith("win+"))
         {
             var parts = lower.Split('+');
             var modifiers = new List<ushort>();
@@ -351,9 +351,9 @@ public class ActionExecutor
                     case "ctrl": modifiers.Add(Win32.VK_CONTROL); break;
                     case "alt": modifiers.Add(Win32.VK_MENU); break;
                     case "shift": modifiers.Add(Win32.VK_SHIFT); break;
+                    case "win": modifiers.Add(Win32.VK_LWIN); break;
                     default:
-                        if (part.Length == 1)
-                            mainKey = (ushort)char.ToUpperInvariant(part[0]);
+                        mainKey = MapKeyName(part);
                         break;
                 }
             }
@@ -370,6 +370,43 @@ public class ActionExecutor
         {
             Win32.SendKey((ushort)char.ToUpperInvariant(keyName[0]));
         }
+    }
+
+    /// <summary>
+    /// Maps a key name string to its virtual key code.
+    /// Handles single characters, F-keys, and named keys.
+    /// </summary>
+    private static ushort MapKeyName(string name)
+    {
+        return name.ToLowerInvariant() switch
+        {
+            "enter" or "return" => Win32.VK_RETURN,
+            "tab" => Win32.VK_TAB,
+            "escape" or "esc" => Win32.VK_ESCAPE,
+            "space" => Win32.VK_SPACE,
+            "up" => Win32.VK_UP,
+            "down" => Win32.VK_DOWN,
+            "left" => Win32.VK_LEFT,
+            "right" => Win32.VK_RIGHT,
+            "backspace" => Win32.VK_BACK,
+            "delete" => Win32.VK_DELETE,
+            "home" => Win32.VK_HOME,
+            "end" => Win32.VK_END,
+            "f1" => Win32.VK_F1,
+            "f2" => Win32.VK_F2,
+            "f3" => Win32.VK_F3,
+            "f4" => Win32.VK_F4,
+            "f5" => Win32.VK_F5,
+            "f6" => Win32.VK_F6,
+            "f7" => Win32.VK_F7,
+            "f8" => Win32.VK_F8,
+            "f9" => Win32.VK_F9,
+            "f10" => Win32.VK_F10,
+            "f11" => Win32.VK_F11,
+            "f12" => Win32.VK_F12,
+            _ when name.Length == 1 => (ushort)char.ToUpperInvariant(name[0]),
+            _ => 0
+        };
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

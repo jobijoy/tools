@@ -29,6 +29,26 @@ public partial class SettingsWindow : Window
         ShowExecutionCountCheck.IsChecked = s.ShowExecutionCount;
         ClickRadarCheck.IsChecked = s.ClickRadar;
         StartWithWindowsCheck.IsChecked = IsStartupEnabled();
+        
+        // Safety settings
+        KillSwitchHotkeyBox.Text = s.KillSwitchHotkey;
+        AllowedProcessesBox.Text = string.Join(", ", s.AllowedProcesses);
+        AllowlistWarning.Visibility = s.AllowedProcesses.Count == 0
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
+        
+        // Agent settings
+        var agent = cfg.AgentSettings;
+        AgentEndpointBox.Text = agent.Endpoint;
+        AgentModelBox.Text = agent.ModelId;
+        AgentApiKeyBox.Password = agent.ApiKey;
+        AgentMaxTokensBox.Text = agent.MaxTokens.ToString();
+        AgentTemperatureBox.Text = agent.Temperature.ToString("F1");
+        
+        // Vision fallback settings
+        VisionFallbackCheck.IsChecked = agent.VisionFallbackEnabled;
+        VisionModelBox.Text = agent.VisionModelId;
+        VisionConfidenceBox.Text = agent.VisionConfidenceThreshold.ToString("F1");
     }
 
     private bool IsStartupEnabled()
@@ -82,8 +102,36 @@ public partial class SettingsWindow : Window
         s.ShowExecutionCount = ShowExecutionCountCheck.IsChecked == true;
         s.ClickRadar = ClickRadarCheck.IsChecked == true;
 
+        // Safety settings
+        s.KillSwitchHotkey = KillSwitchHotkeyBox.Text.Trim();
+        s.AllowedProcesses = AllowedProcessesBox.Text
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+
+        // Agent settings
+        var agent = cfg.AgentSettings;
+        agent.Endpoint = AgentEndpointBox.Text.Trim();
+        agent.ModelId = AgentModelBox.Text.Trim();
+        agent.ApiKey = AgentApiKeyBox.Password;
+        if (int.TryParse(AgentMaxTokensBox.Text.Trim(), out var maxTokens) && maxTokens > 0)
+            agent.MaxTokens = maxTokens;
+        if (double.TryParse(AgentTemperatureBox.Text.Trim(), out var temp) && temp >= 0 && temp <= 2)
+            agent.Temperature = temp;
+        
+        // Vision fallback settings
+        agent.VisionFallbackEnabled = VisionFallbackCheck.IsChecked == true;
+        agent.VisionModelId = VisionModelBox.Text.Trim();
+        if (double.TryParse(VisionConfidenceBox.Text.Trim(), out var threshold) && threshold >= 0 && threshold <= 1)
+            agent.VisionConfidenceThreshold = threshold;
+
         App.Config.SaveConfig(cfg);
         App.Log.SetLevel(s.LogLevel);
+
+        // Reconfigure agent service if settings changed
+        App.Agent?.Reconfigure();
+        
+        // Reconfigure vision service if settings changed
+        App.Vision?.Reconfigure();
 
         // Handle Windows startup separately (registry, not config)
         SetStartupEnabled(StartWithWindowsCheck.IsChecked == true);

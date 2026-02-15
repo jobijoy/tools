@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idolclick.dev/schemas/v1/test-flow.schema.json",
+  "title": "IdolClick Test Flow v1",
+  "description": "Deterministic UI automation flow — the exchange format between AI coding agents and IdolClick execution engine.",
+  "type": "object",
+  "required": ["schemaVersion", "testName", "steps"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version for forward compatibility. Must be 1."
+    },
+    "testName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name for this test flow."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description of what this flow verifies."
+    },
+    "targetApp": {
+      "type": "string",
+      "description": "Target application process name(s), comma-separated. Empty = any app."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/TestStep" },
+      "description": "Ordered list of steps to execute."
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 120,
+      "description": "Maximum total execution time in seconds. 0 = no limit."
+    },
+    "stopOnFailure": {
+      "type": "boolean",
+      "default": true,
+      "description": "Stop executing on first failure, or continue all steps."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the flow was created."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "StepAction": {
+      "type": "string",
+      "enum": [
+        "click",
+        "type",
+        "send_keys",
+        "wait",
+        "assert_exists",
+        "assert_not_exists",
+        "assert_text",
+        "assert_window",
+        "navigate",
+        "screenshot",
+        "scroll",
+        "focus_window",
+        "launch"
+      ],
+      "description": "Supported step actions. Strongly typed — no free-form strings."
+    },
+    "AssertionType": {
+      "type": "string",
+      "enum": [
+        "exists",
+        "not_exists",
+        "text_contains",
+        "text_equals",
+        "window_title",
+        "process_running"
+      ],
+      "description": "Post-step assertion types."
+    },
+    "ScrollDirection": {
+      "type": "string",
+      "enum": ["up", "down", "left", "right"]
+    },
+    "Selector": {
+      "type": "string",
+      "pattern": "^([A-Za-z]+)?#.+$",
+      "description": "UI element selector. Format: 'ElementType#TextOrAutomationId'. Examples: 'Button#Save', 'TextBox#SearchField', '#AutomationId'."
+    },
+    "Assertion": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "$ref": "#/$defs/AssertionType" },
+        "selector": { "$ref": "#/$defs/Selector" },
+        "expected": {
+          "type": "string",
+          "description": "Expected value for the assertion."
+        },
+        "exact": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require exact match instead of contains."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 5000,
+          "description": "Timeout in milliseconds."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this assertion verifies."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "enum": ["exists", "not_exists"] } }
+          },
+          "then": { "required": ["selector"] }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["text_contains", "text_equals"] } }
+          },
+          "then": { "required": ["selector", "expected"] }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["window_title", "process_running"] } }
+          },
+          "then": { "required": ["expected"] }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "TestStep": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Explicit execution order (1-based). Auto-assigned if omitted."
+        },
+        "action": { "$ref": "#/$defs/StepAction" },
+        "selector": { "$ref": "#/$defs/Selector" },
+        "text": {
+          "type": "string",
+          "description": "Text to type (for 'type' action)."
+        },
+        "keys": {
+          "type": "string",
+          "description": "Keys to send (for 'send_keys' action). Comma-separated: 'Ctrl+S', 'Tab, Enter'."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to navigate to (for 'navigate' action)."
+        },
+        "contains": {
+          "type": "string",
+          "description": "Expected text content (for 'assert_text'). Substring match unless exact=true."
+        },
+        "exact": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require exact text match instead of substring."
+        },
+        "app": {
+          "type": "string",
+          "description": "Target application process name override for this step."
+        },
+        "windowTitle": {
+          "type": "string",
+          "description": "Window title filter for this step."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 5000,
+          "description": "Wait/timeout in milliseconds for this step."
+        },
+        "delayAfterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 200,
+          "description": "Fixed delay in milliseconds AFTER this step completes."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this step."
+        },
+        "processPath": {
+          "type": "string",
+          "description": "Process path and arguments (for 'launch' action)."
+        },
+        "direction": { "$ref": "#/$defs/ScrollDirection" },
+        "scrollAmount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "Scroll amount in clicks (for 'scroll' action)."
+        },
+        "assertions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Assertion" },
+          "description": "Post-step assertions. Evaluated after the action completes."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "action": { "const": "click" } } },
+          "then": { "required": ["selector"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "type" } } },
+          "then": { "required": ["text"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "send_keys" } } },
+          "then": { "required": ["keys"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "assert_exists" } } },
+          "then": { "required": ["selector"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "assert_not_exists" } } },
+          "then": { "required": ["selector"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "assert_text" } } },
+          "then": { "required": ["selector", "contains"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "navigate" } } },
+          "then": { "required": ["url"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "launch" } } },
+          "then": { "required": ["processPath"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "scroll" } } },
+          "then": { "required": ["direction"] }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -42,7 +42,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.3.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
     <PackageReference Include="System.Windows.Extensions" Version="8.0.0" />
     <!-- PowerShell executed via process spawn - no SDK needed, saves ~80MB -->
     <Reference Include="UIAutomationClient">

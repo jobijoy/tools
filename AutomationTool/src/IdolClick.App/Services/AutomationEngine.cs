@@ -102,10 +102,16 @@ public class AutomationEngine : IDisposable
 
     /// <summary>
     /// Enables or disables rule processing without stopping the polling loop.
+    /// Blocked when the global kill switch is active (requires manual reset first).
     /// </summary>
     /// <param name="enabled">True to process rules, false to pause.</param>
     public void SetEnabled(bool enabled)
     {
+        if (enabled && App.KillSwitchActive)
+        {
+            _log.Warn("Engine", "Cannot enable — kill switch is active. Reset from Settings or UI first.");
+            return;
+        }
         if (_enabled == enabled) return;
         _enabled = enabled;
         _log.Info("Engine", enabled ? "Automation enabled" : "Automation disabled");
@@ -188,6 +194,25 @@ public class AutomationEngine : IDisposable
         if (!IsInTimeWindow(rule.TimeWindow))
         {
             _log.Debug("Skip", $"{tag} Outside time window '{rule.TimeWindow}'");
+            return false;
+        }
+
+        // Safety: Process allowlist
+        var allowedProcesses = _config.GetConfig().Settings.AllowedProcesses;
+        if (allowedProcesses.Count > 0 && !string.IsNullOrEmpty(rule.TargetApp))
+        {
+            var ruleProcesses = rule.TargetApp.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (!ruleProcesses.Any(p => allowedProcesses.Contains(p, StringComparer.OrdinalIgnoreCase)))
+            {
+                _log.Warn("Safety", $"{tag} Blocked — process '{rule.TargetApp}' not in AllowedProcesses");
+                return false;
+            }
+        }
+
+        // Safety: Max executions per session
+        if (rule.MaxExecutionsPerSession > 0 && rule.SessionExecutionCount >= rule.MaxExecutionsPerSession)
+        {
+            _log.Debug("Skip", $"{tag} Max executions reached ({rule.SessionExecutionCount}/{rule.MaxExecutionsPerSession})");
             return false;
         }
 

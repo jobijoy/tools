@@ -43,6 +43,78 @@
 
             <Separator Margin="0,15"/>
 
+            <TextBlock Text="Safety" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,10,0,6"/>
+            <TextBlock Text="Safety guardrails protect against accidental damage and runaway automation." 
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+            <Label Content="Kill Switch Hotkey" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+            <TextBox x:Name="KillSwitchHotkeyBox" Margin="0,0,0,10" 
+                     ToolTip="Emergency stop hotkey — instantly disables all automation (e.g., Ctrl+Alt+Escape)"/>
+
+            <Label Content="Allowed Processes (comma-separated)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+            <TextBox x:Name="AllowedProcessesBox" Margin="0,0,0,4" 
+                     ToolTip="Only automate these processes. Supports wildcards (e.g., notepad, MyApp*). Leave empty to allow all."/>
+            <TextBlock x:Name="AllowlistWarning" Text="⚠ No process allowlist set — automation can target any window" 
+                       Foreground="#FFB74D" FontSize="11" Margin="0,0,0,10" Visibility="Collapsed"/>
+
+            <Separator Margin="0,15"/>
+
+            <TextBlock Text="Agent (AI)" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+            
+            <Label Content="LLM Endpoint" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+            <TextBox x:Name="AgentEndpointBox" Margin="0,0,0,10" 
+                     ToolTip="API endpoint URL (e.g., https://models.inference.ai.azure.com, http://localhost:11434/v1)"/>
+            
+            <Label Content="Model ID" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+            <TextBox x:Name="AgentModelBox" Margin="0,0,0,10" 
+                     ToolTip="Model deployment name or ID (e.g., gpt-4o, gpt-4o-mini)"/>
+            
+            <Label Content="API Key" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+            <PasswordBox x:Name="AgentApiKeyBox" Margin="0,0,0,10" 
+                         Background="{StaticResource CardBrush}" Foreground="{StaticResource TextBrush}"
+                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" 
+                         Padding="8,6"
+                         ToolTip="API key for the LLM endpoint"/>
+            
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Label Content="Max Tokens" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="AgentMaxTokensBox" ToolTip="Maximum tokens per response (default: 4096)"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <Label Content="Temperature" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="AgentTemperatureBox" ToolTip="0.0 = deterministic, 1.0 = creative (default: 0.3)"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Text="Vision Fallback" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,6"/>
+            <TextBlock Text="Uses LLM vision to locate elements when UIA selectors fail. Requires a vision-capable model (gpt-4o, claude-3.5-sonnet, etc.)." 
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            
+            <CheckBox x:Name="VisionFallbackCheck" Content="Enable vision fallback" Margin="0,0,0,10" 
+                      ToolTip="When UIA selectors fail, capture a screenshot and ask the LLM to locate the element visually"/>
+            
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Label Content="Vision Model (optional)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="VisionModelBox" ToolTip="Separate model ID for vision requests. Leave empty to use the main model."/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <Label Content="Confidence Threshold" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="VisionConfidenceBox" ToolTip="Minimum confidence (0.0–1.0) to accept vision results (default: 0.7)"/>
+                </StackPanel>
+            </Grid>
+
+            <Separator Margin="0,15"/>
+
             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                 <Button Content="📂 Config Folder" Style="{StaticResource ModernButton}" Click="OpenConfigFolder_Click" Margin="0,0,10,0"/>
                 <Button Content="📋 Logs Folder" Style="{StaticResource ModernButton}" Click="OpenLogsFolder_Click"/>
