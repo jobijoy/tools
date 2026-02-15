@@ -186,41 +186,94 @@ public class ActionExecutor
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Clicks a UI element using the most reliable method available.
+    /// Clicks a UI element using the most reliable method available,
+    /// preserving the user's current focus and cursor position.
     /// </summary>
     /// <remarks>
-    /// Attempts methods in order: InvokePattern → ClickablePoint → BoundingRect center.
+    /// <para>Attempts methods in order of least-intrusive to most-intrusive:</para>
+    /// <list type="number">
+    ///   <item><description>InvokePattern — programmatic invocation, no focus steal</description></item>
+    ///   <item><description>ClickablePoint — physical click with focus save/restore</description></item>
+    ///   <item><description>BoundingRect center — physical click with focus save/restore</description></item>
+    /// </list>
+    /// <para>For physical clicks, the cursor and foreground window are saved before
+    /// the click and restored immediately after (~30ms total disruption).</para>
+    /// <para>When ClickRadar is enabled, a concentric-circle pulse animation is shown
+    /// at the click point so the user can visually observe the action.</para>
     /// </remarks>
     public void ClickElement(AutomationElement element)
     {
-        // Try InvokePattern first (most reliable)
+        var radarEnabled = App.Config.GetConfig().Settings.ClickRadar;
+        var elementName = "(unknown)";
+        try { elementName = element.Current.Name ?? "(unknown)"; } catch { }
+
+        // Try InvokePattern first — this is programmatic and does NOT steal focus
         try
         {
             if (element.TryGetCurrentPattern(InvokePattern.Pattern, out var p) && p is InvokePattern inv)
             {
+                // Show radar at element center even for InvokePattern clicks
+                if (radarEnabled)
+                {
+                    try
+                    {
+                        var r = element.Current.BoundingRectangle;
+                        if (!r.IsEmpty)
+                            UI.ClickRadarOverlay.Pulse((int)(r.Left + r.Width / 2), (int)(r.Top + r.Height / 2));
+                    }
+                    catch { }
+                }
+
                 inv.Invoke();
+                _log.Debug("Click", $"'{elementName}' via InvokePattern (no focus disruption)");
                 return;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _log.Debug("Click", $"InvokePattern failed for '{elementName}': {ex.GetType().Name}");
+        }
 
-        // Try GetClickablePoint
+        // Physical click fallback — save and restore focus/cursor
+        _log.Debug("Click", $"'{elementName}' falling back to physical click");
+
+        // Try GetClickablePoint with focus restoration
         try
         {
             var pt = element.GetClickablePoint();
-            Win32.Click((int)pt.X, (int)pt.Y);
+            _log.Debug("Click", $"'{elementName}' via ClickablePoint ({(int)pt.X},{(int)pt.Y})");
+            if (radarEnabled)
+                UI.ClickRadarOverlay.Pulse((int)pt.X, (int)pt.Y);
+            Win32.ClickAndRestoreFocus((int)pt.X, (int)pt.Y);
             return;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _log.Debug("Click", $"ClickablePoint failed for '{elementName}': {ex.GetType().Name}");
+        }
 
-        // Fallback to center of bounding rect
+        // Fallback to center of bounding rect with focus restoration
         try
         {
             var r = element.Current.BoundingRectangle;
             if (!r.IsEmpty)
-                Win32.Click((int)(r.Left + r.Width / 2), (int)(r.Top + r.Height / 2));
+            {
+                var cx = (int)(r.Left + r.Width / 2);
+                var cy = (int)(r.Top + r.Height / 2);
+                _log.Debug("Click", $"'{elementName}' via BoundingRect center ({cx},{cy})");
+                if (radarEnabled)
+                    UI.ClickRadarOverlay.Pulse(cx, cy);
+                Win32.ClickAndRestoreFocus(cx, cy);
+            }
+            else
+            {
+                _log.Warn("Click", $"'{elementName}' has empty BoundingRect — click skipped");
+            }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _log.Error("Click", $"All click methods failed for '{elementName}': {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -236,7 +289,7 @@ public class ActionExecutor
         {
             var hwnd = new IntPtr(window.Current.NativeWindowHandle);
             Win32.SetForegroundWindow(hwnd);
-            Thread.Sleep(100);
+            Thread.Sleep(50); // Reduced from 100ms — just enough for OS to switch
         }
         catch { }
     }

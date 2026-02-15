@@ -74,6 +74,12 @@ public class GlobalSettings
     /// </summary>
     public bool ShowExecutionCount { get; set; } = true;
     
+    /// <summary>
+    /// Show a "radar pulse" animation at the click point so you can observe automation actions.
+    /// The overlay is fully click-through and never steals focus.
+    /// </summary>
+    public bool ClickRadar { get; set; } = true;
+    
     // === Scripting ===
     
     /// <summary>

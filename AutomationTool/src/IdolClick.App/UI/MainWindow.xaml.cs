@@ -74,6 +74,8 @@ public partial class MainWindow : Window
         
         if (wasExpanded != _isExpanded)
             ApplyViewMode();
+        else
+            ResizeColumns(); // Always re-distribute columns on resize
     }
 
     private void Window_StateChanged(object sender, EventArgs e)
@@ -109,37 +111,80 @@ public partial class MainWindow : Window
         IntervalCombo.Visibility = expandedVisibility;
         IntervalText.Visibility = compactVisibility;
 
-        // Adjust column widths based on mode
-        var cfg = App.Config.GetConfig();
-        var showExecCount = cfg.Settings.ShowExecutionCount;
-        
-        if (_isExpanded)
-        {
-            ColStatus.Width = 24;
-            ColName.Width = 130;
-            ColApp.Width = 90;
-            ColMatch.Width = 130;
-            ColAction.Width = 70;
-            ColCooldown.Width = 40;
-            ColSessionExec.Width = showExecCount ? 45 : 0;
-            ColTriggers.Width = 40;
-            ColLastTrigger.Width = 80;
-        }
-        else
-        {
-            ColStatus.Width = 22;
-            ColName.Width = 100;
-            ColApp.Width = 60;
-            ColMatch.Width = 80;
-            ColAction.Width = 50;
-            ColCooldown.Width = 28;
-            ColSessionExec.Width = showExecCount ? 35 : 0;
-            ColTriggers.Width = 22;
-            ColLastTrigger.Width = 50;
-        }
+        // Re-distribute column widths based on current window size
+        ResizeColumns();
 
         // Update title
         Title = _isExpanded ? "Idol Click v1.0.0" : "Idol Click";
+    }
+
+    /// <summary>
+    /// Proportionally distributes GridViewColumn widths to fill available space.
+    /// Called on window resize and view mode changes for DPI/resolution independence.
+    /// </summary>
+    private void ResizeColumns()
+    {
+        // Calculate available width for the rules ListView
+        // Subtract profile pane if visible, margins (8*2=16), borders ~2
+        var profileWidth = ProfilePane.Visibility == Visibility.Visible ? ProfilePaneColumn.ActualWidth : 0;
+        var available = ActualWidth - profileWidth - 24; // 24 = margins + padding + scrollbar
+        if (available < 200) return; // Too small, skip
+
+        var cfg = App.Config.GetConfig();
+        var showExecCount = cfg.Settings.ShowExecutionCount;
+
+        // Fixed-width columns (status, checkbox, play/pause, cooldown, session, triggers, last)
+        double fixedTotal = 0;
+
+        // Status indicator: small fixed
+        var statusW = _isExpanded ? 24.0 : 22.0;
+        ColStatus.Width = statusW;
+        fixedTotal += statusW;
+
+        // Checkbox: 28
+        fixedTotal += 28;
+
+        // Play/Pause button: 26
+        fixedTotal += 26;
+
+        // Cooldown
+        var cdW = _isExpanded ? 38.0 : 28.0;
+        ColCooldown.Width = cdW;
+        fixedTotal += cdW;
+
+        // Session exec count
+        var sessionW = showExecCount ? (_isExpanded ? 42.0 : 35.0) : 0;
+        ColSessionExec.Width = sessionW;
+        fixedTotal += sessionW;
+
+        // Trigger count
+        var trigW = _isExpanded ? 36.0 : 22.0;
+        ColTriggers.Width = trigW;
+        fixedTotal += trigW;
+
+        // Last triggered
+        var lastW = _isExpanded ? 72.0 : 50.0;
+        ColLastTrigger.Width = lastW;
+        fixedTotal += lastW;
+
+        // Remaining space is split proportionally among Name, App, Match, Action
+        var flex = Math.Max(100, available - fixedTotal);
+
+        // Proportions: Name 28%, App 18%, Match 32%, Action 14%  (compact shifts slightly)
+        if (_isExpanded)
+        {
+            ColName.Width = Math.Max(60, flex * 0.27);
+            ColApp.Width = Math.Max(40, flex * 0.18);
+            ColMatch.Width = Math.Max(60, flex * 0.34);
+            ColAction.Width = Math.Max(40, flex * 0.14);
+        }
+        else
+        {
+            ColName.Width = Math.Max(50, flex * 0.28);
+            ColApp.Width = Math.Max(35, flex * 0.17);
+            ColMatch.Width = Math.Max(50, flex * 0.30);
+            ColAction.Width = Math.Max(35, flex * 0.15);
+        }
     }
 
     private void LoadSettings()
@@ -160,7 +205,7 @@ public partial class MainWindow : Window
         }
         
         // Show/hide execution count column based on setting
-        ColSessionExec.Width = cfg.Settings.ShowExecutionCount ? 35 : 0;
+        ResizeColumns();
 
         UpdateStatus();
     }
@@ -243,12 +288,15 @@ public partial class MainWindow : Window
         var isVisible = ProfilePane.Visibility == Visibility.Visible;
         ProfilePane.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
         ProfilePaneColumn.Width = isVisible ? new GridLength(0) : new GridLength(180);
+        // Delay column resize slightly so layout has updated ActualWidth
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ResizeColumns);
     }
 
     private void HideProfilePane_Click(object sender, RoutedEventArgs e)
     {
         ProfilePane.Visibility = Visibility.Collapsed;
         ProfilePaneColumn.Width = new GridLength(0);
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ResizeColumns);
     }
 
     private void ProfileListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

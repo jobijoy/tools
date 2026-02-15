@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
         ShowPanelOnStartCheck.IsChecked = s.ShowPanelOnStart;
         MouseNudgeCheck.IsChecked = s.GlobalMouseNudge;
         ShowExecutionCountCheck.IsChecked = s.ShowExecutionCount;
+        ClickRadarCheck.IsChecked = s.ClickRadar;
         StartWithWindowsCheck.IsChecked = IsStartupEnabled();
     }
 
@@ -79,6 +80,7 @@ public partial class SettingsWindow : Window
         s.ShowPanelOnStart = ShowPanelOnStartCheck.IsChecked == true;
         s.GlobalMouseNudge = MouseNudgeCheck.IsChecked == true;
         s.ShowExecutionCount = ShowExecutionCountCheck.IsChecked == true;
+        s.ClickRadar = ClickRadarCheck.IsChecked == true;
 
         App.Config.SaveConfig(cfg);
         App.Log.SetLevel(s.LogLevel);

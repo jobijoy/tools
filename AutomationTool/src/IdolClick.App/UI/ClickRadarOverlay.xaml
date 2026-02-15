@@ -1,0 +1,17 @@
+<Window x:Class="IdolClick.UI.ClickRadarOverlay"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ClickRadar"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        IsHitTestVisible="False"
+        Width="200" Height="200">
+
+    <Canvas x:Name="RadarCanvas" ClipToBounds="False">
+        <!-- Concentric circles are drawn programmatically -->
+    </Canvas>
+</Window>

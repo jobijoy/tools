@@ -6,8 +6,7 @@ A collection of Windows utilities and automation tools.
 
 | Project | Description |
 |---------|-------------|
-| [IdolClick](AutomationTool/) | **⭐ NEW** – Smart Windows UI automation from your system tray |
-| [AllowClicker](AllowClicker/) | Simple WinForms tray app for auto-clicking VS Code dialogs |
+| [IdolClick](AutomationTool/) | Smart Windows UI automation from your system tray |
 
 ## Getting Started
 

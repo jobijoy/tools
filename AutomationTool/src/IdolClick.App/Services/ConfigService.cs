@@ -181,50 +181,42 @@ public class ConfigService
     {
         Settings = new GlobalSettings
         {
-            PollingIntervalMs = 10000,
             AutomationEnabled = false,
-            ShowPanelOnStart = true,
+            PollingIntervalMs = 3000,
             ToggleHotkey = "Ctrl+Alt+T",
+            ShowPanelOnStart = true,
+            GlobalMouseNudge = false,
             LogLevel = "Info",
-            Theme = "Dark"
+            Theme = "Dark",
+            ShowExecutionCount = true,
+            ClickRadar = true,
+            ScriptingEnabled = true,
+            DefaultScriptTimeoutMs = 5000,
+            PluginsEnabled = true,
+            DisabledPlugins = [],
+            TimelineEnabled = true,
+            MaxTimelineEvents = 1000,
+            PersistTimeline = false,
+            NotificationDefaults = new NotificationDefaults
+            {
+                ToastOnRuleMatch = false,
+                IncludeTimestamp = true
+            }
         },
         Rules =
         [
             new Rule
             {
-                Id = "vscode-copilot-allow",
-                Name = "VS Code Copilot Allow/Continue",
+                SchemaVersion = 1,
+                Id = "vscode-allow",
+                Name = "VS Code Allow Button",
                 Enabled = true,
                 TargetApp = "Code, Code - Insiders",
                 ElementType = "Button",
-                MatchText = "Allow, Continue, OK, Yes",
-                ExcludeTexts = ["Don't Allow", "Cancel", "No", "Continue Chat", "Continue in"],
+                MatchText = "Allow, Continue, Yes, OK, Accept",
+                ExcludeTexts = ["Continue Chat in", "Continue in"],
                 Action = "Click",
-                CooldownSeconds = 5
-            },
-            new Rule
-            {
-                Id = "github-select-jobijoy",
-                Name = "GitHub Select jobijoy Account",
-                Enabled = true,
-                TargetApp = "",
-                WindowTitle = "Select an account",
-                ElementType = "Any",
-                MatchText = "jobijoy",
-                Action = "Click",
-                CooldownSeconds = 5
-            },
-            new Rule
-            {
-                Id = "github-continue",
-                Name = "GitHub Continue Button",
-                Enabled = true,
-                TargetApp = "",
-                WindowTitle = "Select an account",
-                ElementType = "Button",
-                MatchText = "Continue",
-                Action = "Click",
-                CooldownSeconds = 5
+                CooldownSeconds = 2
             }
         ]
     };

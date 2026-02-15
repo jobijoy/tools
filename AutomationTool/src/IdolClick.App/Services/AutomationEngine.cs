@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Windows.Automation;
@@ -38,8 +39,15 @@ public class AutomationEngine : IDisposable
     
     /// <summary>
     /// Tracks last trigger time per rule ID to enforce cooldown periods.
+    /// Thread-safe: accessed from the background worker thread.
     /// </summary>
-    private readonly Dictionary<string, DateTime> _lastTrigger = new();
+    private readonly ConcurrentDictionary<string, DateTime> _lastTrigger = new();
+    
+    /// <summary>
+    /// Debounce timer for config saves to avoid writing to disk on every trigger.
+    /// </summary>
+    private DateTime _lastConfigSave = DateTime.MinValue;
+    private const int ConfigSaveDebounceMs = 5000;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // PROPERTIES
@@ -110,6 +118,9 @@ public class AutomationEngine : IDisposable
     // MAIN LOOP
     // ═══════════════════════════════════════════════════════════════════════════════
     
+    /// <summary>Monotonically increasing cycle counter for log correlation.</summary>
+    private long _cycleNumber;
+
     private async Task RunLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -119,18 +130,31 @@ public class AutomationEngine : IDisposable
 
             if (_enabled)
             {
+                var cycle = Interlocked.Increment(ref _cycleNumber);
+                var sw = Stopwatch.StartNew();
+                var rulesEvaluated = 0;
+                var rulesTriggered = 0;
+
                 try
                 {
-                    foreach (var rule in cfg.Rules.Where(r => r.Enabled && r.IsRunning))
+                    var activeRules = cfg.Rules.Where(r => r.Enabled && r.IsRunning).ToList();
+                    _log.Debug("Cycle", $"[C{cycle}] Begin — {activeRules.Count} active rules, interval={interval}ms");
+
+                    foreach (var rule in activeRules)
                     {
                         if (ct.IsCancellationRequested) break;
-                        ProcessRule(rule);
+                        rulesEvaluated++;
+                        if (ProcessRule(rule, cycle))
+                            rulesTriggered++;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _log.Error("Engine", $"Error: {ex.Message}");
+                    _log.Error("Engine", $"[C{cycle}] Unhandled: {ex.GetType().Name}: {ex.Message}");
                 }
+
+                sw.Stop();
+                _log.Debug("Cycle", $"[C{cycle}] End — {rulesEvaluated} evaluated, {rulesTriggered} triggered, {sw.ElapsedMilliseconds}ms");
             }
 
             await Task.Delay(interval, ct).ConfigureAwait(false);
@@ -143,35 +167,69 @@ public class AutomationEngine : IDisposable
 
     /// <summary>
     /// Processes a single rule: finds matching elements and executes actions.
+    /// Returns true if the rule triggered an action this cycle.
     /// </summary>
-    private void ProcessRule(Rule rule)
+    private bool ProcessRule(Rule rule, long cycle)
     {
+        var tag = $"[C{cycle}][{rule.Name}]";
+
         // Check cooldown
         if (_lastTrigger.TryGetValue(rule.Id, out var lastTime))
         {
             var elapsed = (DateTime.UtcNow - lastTime).TotalSeconds;
-            if (elapsed < rule.CooldownSeconds) return;
+            if (elapsed < rule.CooldownSeconds)
+            {
+                _log.Debug("Skip", $"{tag} Cooldown ({elapsed:F1}s / {rule.CooldownSeconds}s)");
+                return false;
+            }
         }
 
         // Check time window
-        if (!IsInTimeWindow(rule.TimeWindow)) return;
+        if (!IsInTimeWindow(rule.TimeWindow))
+        {
+            _log.Debug("Skip", $"{tag} Outside time window '{rule.TimeWindow}'");
+            return false;
+        }
 
         // Find target windows
         var windows = FindWindows(rule);
-        if (windows.Count == 0) return;
-        
+        if (windows.Count == 0)
+        {
+            _log.Debug("Skip", $"{tag} No windows (app='{rule.TargetApp}', title='{rule.WindowTitle}')");
+            return false;
+        }
 
+        _log.Debug("Scan", $"{tag} Found {windows.Count} candidate window(s)");
 
         foreach (var window in windows)
         {
             // Check focus requirement
-            if (rule.RequireFocus && !IsWindowFocused(window)) continue;
+            if (rule.RequireFocus && !IsWindowFocused(window))
+            {
+                _log.Debug("Skip", $"{tag} Window not focused (RequireFocus=true)");
+                continue;
+            }
 
-            var element = FindElement(window, rule);
-            if (element == null) continue;
+            AutomationElement? element;
+            try
+            {
+                element = FindElement(window, rule);
+            }
+            catch (Exception ex)
+            {
+                _log.Warn("Scan", $"{tag} FindElement error: {ex.GetType().Name}: {ex.Message}");
+                continue;
+            }
 
-            var elementName = element.Current.Name ?? "(unnamed)";
-            _log.Debug("Match", $"Rule '{rule.Name}' matched: {elementName}");
+            if (element == null)
+            {
+                _log.Debug("Skip", $"{tag} No matching element (type='{rule.ElementType}', match='{rule.MatchText}')");
+                continue;
+            }
+
+            var elementName = "(unnamed)";
+            try { elementName = element.Current.Name ?? "(unnamed)"; } catch { }
+            _log.Debug("Match", $"{tag} Matched element: '{elementName}'");
 
             // Safety: Check for alert patterns in nearby text
             if (rule.AlertIfContains.Length > 0)
@@ -181,36 +239,57 @@ public class AutomationEngine : IDisposable
                 {
                     if (nearbyText.Contains(pattern, StringComparison.OrdinalIgnoreCase))
                     {
-                        _log.Warn("Safety", $"Alert triggered: '{pattern}' found near '{elementName}'");
+                        _log.Warn("Safety", $"{tag} Alert triggered: '{pattern}' found near '{elementName}'");
                         OnAlert?.Invoke(rule, $"Found '{pattern}' - Please review before proceeding");
-                        return;
+                        return false;
                     }
                 }
             }
 
-            // Safety: Confirm before action
+            // Safety: Confirm before action (dispatch to UI thread)
             if (rule.ConfirmBeforeAction)
             {
-                var confirmed = OnConfirmRequired?.Invoke(rule, elementName) ?? true;
+                bool confirmed = true;
+                try
+                {
+                    confirmed = System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                        OnConfirmRequired?.Invoke(rule, elementName) ?? true) ?? true;
+                }
+                catch (Exception ex)
+                {
+                    _log.Warn("Safety", $"{tag} Confirm dialog error: {ex.Message}; proceeding");
+                }
+
                 if (!confirmed)
                 {
-                    _log.Info("Safety", $"Action cancelled by user for '{elementName}'");
-                    return;
+                    _log.Info("Safety", $"{tag} Action cancelled by user for '{elementName}'");
+                    return false;
                 }
             }
 
             // Execute action
+            var actionSw = Stopwatch.StartNew();
             ExecuteAction(rule, element, window);
+            actionSw.Stop();
+            _log.Debug("Perf", $"{tag} Action '{rule.Action}' took {actionSw.ElapsedMilliseconds}ms");
             
             // Update tracking
             _lastTrigger[rule.Id] = DateTime.UtcNow;
             rule.LastTriggered = DateTime.Now;
             rule.TriggerCount++;
             rule.SessionExecutionCount++;  // In-memory session count
-            _config.SaveConfig(_config.GetConfig());
             
-            return; // One action per rule per cycle
+            // Debounce config saves — avoid disk I/O on every trigger
+            if ((DateTime.UtcNow - _lastConfigSave).TotalMilliseconds > ConfigSaveDebounceMs)
+            {
+                _config.SaveConfig(_config.GetConfig());
+                _lastConfigSave = DateTime.UtcNow;
+            }
+            
+            return true; // One action per rule per cycle
         }
+
+        return false;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -274,25 +353,40 @@ public class AutomationEngine : IDisposable
 
             foreach (var procName in processNames)
             {
-                foreach (var proc in Process.GetProcessesByName(procName))
+                Process[] procs;
+                try
                 {
-                    if (proc.MainWindowHandle == IntPtr.Zero) continue;
-                    var handle = proc.MainWindowHandle.ToInt32();
-                    if (seen.Contains(handle)) continue;
+                    procs = Process.GetProcessesByName(procName);
+                }
+                catch
+                {
+                    continue;
+                }
 
-                    try
+                foreach (var proc in procs)
+                {
+                    using (proc) // Dispose Process handle to prevent leaks
                     {
-                        var elem = AutomationElement.FromHandle(proc.MainWindowHandle);
-                        var title = elem.Current.Name ?? "";
+                        try
+                        {
+                            if (proc.MainWindowHandle == IntPtr.Zero) continue;
+                            var handle = proc.MainWindowHandle.ToInt32();
+                            if (seen.Contains(handle)) continue;
 
-                        if (!string.IsNullOrEmpty(rule.WindowTitle) &&
-                            !title.Contains(rule.WindowTitle, StringComparison.OrdinalIgnoreCase))
-                            continue;
+                            var elem = AutomationElement.FromHandle(proc.MainWindowHandle);
+                            var title = elem.Current.Name ?? "";
 
-                        results.Add(elem);
-                        seen.Add(handle);
+                            if (!string.IsNullOrEmpty(rule.WindowTitle) &&
+                                !title.Contains(rule.WindowTitle, StringComparison.OrdinalIgnoreCase))
+                                continue;
+
+                            results.Add(elem);
+                            seen.Add(handle);
+                        }
+                        catch (System.Windows.Automation.ElementNotAvailableException) { }
+                        catch (System.ComponentModel.Win32Exception) { }
+                        catch (InvalidOperationException) { }
                     }
-                    catch { }
                 }
             }
         }
@@ -305,16 +399,20 @@ public class AutomationEngine : IDisposable
                 var all = AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition);
                 for (int i = 0; i < all.Count; i++)
                 {
-                    var w = all[i];
-                    var handle = w.Current.NativeWindowHandle;
-                    if (seen.Contains(handle)) continue;
-
-                    var title = w.Current.Name ?? "";
-                    if (title.Contains(rule.WindowTitle, StringComparison.OrdinalIgnoreCase))
+                    try
                     {
-                        results.Add(w);
-                        seen.Add(handle);
+                        var w = all[i];
+                        var handle = w.Current.NativeWindowHandle;
+                        if (seen.Contains(handle)) continue;
+
+                        var title = w.Current.Name ?? "";
+                        if (title.Contains(rule.WindowTitle, StringComparison.OrdinalIgnoreCase))
+                        {
+                            results.Add(w);
+                            seen.Add(handle);
+                        }
                     }
+                    catch (System.Windows.Automation.ElementNotAvailableException) { }
                 }
             }
             catch { }
@@ -349,15 +447,39 @@ public class AutomationEngine : IDisposable
         var windowRect = window.Current.BoundingRectangle;
         var patterns = rule.MatchText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
+        int scanned = 0, excluded = 0, regionSkipped = 0, disabledSkipped = 0;
+
         for (int i = 0; i < elements.Count; i++)
         {
-            var elem = elements[i];
-            var name = (elem.Current.Name ?? "").Trim();
+            AutomationElement elem;
+            try
+            {
+                elem = elements[i];
+            }
+            catch (System.Windows.Automation.ElementNotAvailableException)
+            {
+                continue; // Element disappeared between enumeration and access
+            }
+
+            string name;
+            try
+            {
+                name = (elem.Current.Name ?? "").Trim();
+            }
+            catch (System.Windows.Automation.ElementNotAvailableException)
+            {
+                continue;
+            }
+
             if (string.IsNullOrEmpty(name)) continue;
+            scanned++;
 
             // Check exclusions
             if (rule.ExcludeTexts.Any(e => name.Contains(e, StringComparison.OrdinalIgnoreCase)))
+            {
+                excluded++;
                 continue;
+            }
 
             // Check pattern match
             if (!MatchesPatterns(name, patterns, rule.UseRegex))
@@ -366,17 +488,40 @@ public class AutomationEngine : IDisposable
             // Check region
             if (rule.Region != null)
             {
-                var rect = elem.Current.BoundingRectangle;
-                if (!IsInRegion(rect, windowRect, rule.Region))
+                try
+                {
+                    var rect = elem.Current.BoundingRectangle;
+                    if (!IsInRegion(rect, windowRect, rule.Region))
+                    {
+                        regionSkipped++;
+                        continue;
+                    }
+                }
+                catch (System.Windows.Automation.ElementNotAvailableException)
+                {
                     continue;
+                }
             }
 
             // Check enabled
-            if (!elem.Current.IsEnabled) continue;
+            try
+            {
+                if (!elem.Current.IsEnabled)
+                {
+                    disabledSkipped++;
+                    continue;
+                }
+            }
+            catch (System.Windows.Automation.ElementNotAvailableException)
+            {
+                continue;
+            }
 
+            _log.Debug("Scan", $"FindElement: scanned={scanned}, excluded={excluded}, regionSkip={regionSkipped}, disabled={disabledSkipped} → matched '{name}'");
             return elem;
         }
 
+        _log.Debug("Scan", $"FindElement: scanned={scanned}/{elements.Count} named, excluded={excluded}, regionSkip={regionSkipped}, disabled={disabledSkipped} → no match");
         return null;
     }
 
@@ -429,6 +574,7 @@ public class AutomationEngine : IDisposable
 
     /// <summary>
     /// Collects text content near the specified element for safety pattern checking.
+    /// Guarded against stale elements and UI Automation exceptions.
     /// </summary>
     private static string GetNearbyText(AutomationElement window, AutomationElement element)
     {
@@ -441,11 +587,15 @@ public class AutomationEngine : IDisposable
             var nearby = new List<string>();
             for (int i = 0; i < texts.Count; i++)
             {
-                var t = texts[i];
-                var tRect = t.Current.BoundingRectangle;
-                var distance = Math.Sqrt(Math.Pow(rect.Left - tRect.Left, 2) + Math.Pow(rect.Top - tRect.Top, 2));
-                if (distance < 200)
-                    nearby.Add(t.Current.Name ?? "");
+                try
+                {
+                    var t = texts[i];
+                    var tRect = t.Current.BoundingRectangle;
+                    var distance = Math.Sqrt(Math.Pow(rect.Left - tRect.Left, 2) + Math.Pow(rect.Top - tRect.Top, 2));
+                    if (distance < 200)
+                        nearby.Add(t.Current.Name ?? "");
+                }
+                catch (System.Windows.Automation.ElementNotAvailableException) { }
             }
             return string.Join(" ", nearby);
         }
@@ -457,47 +607,37 @@ public class AutomationEngine : IDisposable
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Executes the configured action for a matched element.
+    /// Executes the configured action for a matched element via the unified async path.
+    /// Routes through ExecuteRuleActionAsync for consistent DryRun, Timeline, Notification, and Plugin support.
     /// </summary>
     private void ExecuteAction(Rule rule, AutomationElement element, AutomationElement window)
     {
-        var name = element.Current.Name ?? "(unknown)";
+        var name = "(unknown)";
+        try { name = element.Current.Name ?? "(unknown)"; } catch { }
 
-        switch (rule.Action.ToLowerInvariant())
+        // Build context for the full pipeline
+        var context = new AutomationContext
         {
-            case "click":
-                _executor.ClickElement(element);
-                _log.Info("Action", $"Clicked '{name}' (Rule: {rule.Name})");
-                break;
+            MatchedText = name,
+            WindowHandle = IntPtr.Zero,
+            WindowTitle = "",
+            ProcessName = rule.TargetApp
+        };
 
-            case "sendkeys":
-                if (!string.IsNullOrEmpty(rule.Keys))
-                {
-                    _executor.ActivateWindow(window);
-                    _executor.SendKeys(rule.Keys);
-                    _log.Info("Action", $"Sent keys to '{name}' (Rule: {rule.Name})");
-                }
-                break;
-
-            case "runscript":
-                if (!string.IsNullOrEmpty(rule.Script))
-                {
-                    _executor.RunScript(rule.ScriptLanguage, rule.Script);
-                    _log.Info("Action", $"Ran {rule.ScriptLanguage} script (Rule: {rule.Name})");
-                }
-                break;
-
-            case "shownotification":
-                var msg = rule.NotificationMessage ?? name;
-                OnAlert?.Invoke(rule, msg);
-                _log.Info("Action", $"Showed notification: {msg}");
-                break;
-
-            case "alert":
-                _log.Warn("Alert", $"Alert triggered for '{name}' (Rule: {rule.Name})");
-                OnAlert?.Invoke(rule, $"Found: {name}");
-                break;
+        try
+        {
+            context.WindowTitle = window.Current.Name ?? "";
+            context.WindowHandle = new IntPtr(window.Current.NativeWindowHandle);
         }
+        catch { }
+
+        // Pre-action: activate window if SendKeys (needs focus)
+        if (rule.Action.Equals("sendkeys", StringComparison.OrdinalIgnoreCase))
+            _executor.ActivateWindow(window);
+
+        // Execute through the unified async path (block on it from the worker thread)
+        var success = Task.Run(() => _executor.ExecuteRuleActionAsync(rule, element, context)).GetAwaiter().GetResult();
+        _log.Info("Action", $"{(success ? "✓" : "✗")} '{rule.Action}' on '{name}' (Rule: {rule.Name})");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

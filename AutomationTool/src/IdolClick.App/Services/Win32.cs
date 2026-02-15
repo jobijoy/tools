@@ -46,6 +46,27 @@ internal static class Win32
     private static extern bool SetCursorPos(int X, int Y);
 
     [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X, Y; }
+
+    [DllImport("user32.dll")]
     private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
     // Multi-monitor support
@@ -155,6 +176,133 @@ internal static class Win32
             inputs.Add(new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = new KEYBDINPUT { wVk = mod, dwFlags = KEYEVENTF_KEYUP } } });
 
         SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<INPUT>());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // FOCUS-PRESERVING CLICK
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Saves the current foreground window handle and cursor position.
+    /// Call before performing any click that may steal focus.
+    /// </summary>
+    public static FocusState SaveFocusState()
+    {
+        GetCursorPos(out var cursorPos);
+        return new FocusState
+        {
+            ForegroundWindow = GetForegroundWindow(),
+            CursorX = cursorPos.X,
+            CursorY = cursorPos.Y
+        };
+    }
+
+    /// <summary>
+    /// Restores the foreground window and cursor position captured by SaveFocusState.
+    /// Uses AttachThreadInput to reliably restore focus even across processes.
+    /// </summary>
+    public static void RestoreFocusState(FocusState state)
+    {
+        if (state.ForegroundWindow == IntPtr.Zero) return;
+
+        // Restore cursor position first (fast, no side effects)
+        SetCursorPos(state.CursorX, state.CursorY);
+
+        // Restore foreground window using thread-attach trick for reliability
+        var currentFg = GetForegroundWindow();
+        if (currentFg == state.ForegroundWindow) return; // Already correct
+
+        try
+        {
+            var currentThreadId = GetCurrentThreadId();
+            var fgThreadId = GetWindowThreadProcessId(currentFg, out _);
+            var targetThreadId = GetWindowThreadProcessId(state.ForegroundWindow, out _);
+
+            // Attach our thread to the current foreground thread to gain SetForegroundWindow rights
+            bool attached1 = false, attached2 = false;
+            if (currentThreadId != fgThreadId)
+                attached1 = AttachThreadInput(currentThreadId, fgThreadId, true);
+            if (currentThreadId != targetThreadId)
+                attached2 = AttachThreadInput(currentThreadId, targetThreadId, true);
+
+            SetForegroundWindow(state.ForegroundWindow);
+            BringWindowToTop(state.ForegroundWindow);
+
+            // Detach threads
+            if (attached1) AttachThreadInput(currentThreadId, fgThreadId, false);
+            if (attached2) AttachThreadInput(currentThreadId, targetThreadId, false);
+        }
+        catch
+        {
+            // Best-effort: try simple SetForegroundWindow as fallback
+            SetForegroundWindow(state.ForegroundWindow);
+        }
+    }
+
+    /// <summary>
+    /// Performs a click at screen coordinates and immediately restores focus/cursor.
+    /// The entire operation is designed to be imperceptibly fast.
+    /// </summary>
+    public static void ClickAndRestoreFocus(int x, int y)
+    {
+        var state = SaveFocusState();
+
+        // Get virtual screen bounds (handles multi-monitor setups)
+        int vsLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        int vsTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        int vsWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        int vsHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+        int normalizedX = (int)(((x - vsLeft) * 65535.0) / vsWidth);
+        int normalizedY = (int)(((y - vsTop) * 65535.0) / vsHeight);
+
+        // Move cursor, click down, click up — all in a single SendInput batch for speed
+        SetCursorPos(x, y);
+
+        var inputs = new[]
+        {
+            new INPUT
+            {
+                type = INPUT_MOUSE,
+                U = new InputUnion
+                {
+                    mi = new MOUSEINPUT
+                    {
+                        dx = normalizedX,
+                        dy = normalizedY,
+                        dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN
+                    }
+                }
+            },
+            new INPUT
+            {
+                type = INPUT_MOUSE,
+                U = new InputUnion
+                {
+                    mi = new MOUSEINPUT
+                    {
+                        dx = normalizedX,
+                        dy = normalizedY,
+                        dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_LEFTUP
+                    }
+                }
+            }
+        };
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+
+        // Tiny delay to let the click register, then immediately restore
+        Thread.Sleep(30);
+        RestoreFocusState(state);
+    }
+
+    /// <summary>
+    /// Captured focus state for save/restore operations.
+    /// </summary>
+    public class FocusState
+    {
+        public IntPtr ForegroundWindow;
+        public int CursorX;
+        public int CursorY;
     }
 
     // Hotkey registration

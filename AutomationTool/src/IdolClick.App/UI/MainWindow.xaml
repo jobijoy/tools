@@ -16,7 +16,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="ProfilePaneColumn" Width="180"/>
+            <ColumnDefinition x:Name="ProfilePaneColumn" Width="180" MinWidth="120" MaxWidth="300"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -30,7 +30,7 @@
         <!-- Profile Pane (Left) - Spans all rows -->
         <Border x:Name="ProfilePane" Grid.Column="0" Grid.RowSpan="5" 
                 Background="{StaticResource CardBrush}" 
-                Visibility="Visible" Width="180">
+                Visibility="Visible">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
