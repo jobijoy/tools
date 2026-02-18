@@ -28,6 +28,9 @@ public class AutomationEngine : IDisposable
     private readonly ConfigService _config;
     private readonly LogService _log;
     private readonly ActionExecutor _executor;
+
+    // R4.3: Compiled regex cache to avoid recompilation per polling cycle
+    private static readonly ConcurrentDictionary<string, Regex?> _regexCache = new();
     
     // ═══════════════════════════════════════════════════════════════════════════════
     // STATE
@@ -36,6 +39,7 @@ public class AutomationEngine : IDisposable
     private CancellationTokenSource? _cts;
     private Task? _worker;
     private volatile bool _enabled;
+    private bool _disposed;
     
     /// <summary>
     /// Tracks last trigger time per rule ID to enforce cooldown periods.
@@ -94,6 +98,8 @@ public class AutomationEngine : IDisposable
     /// </summary>
     public void Start()
     {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(AutomationEngine));
         if (_worker != null) return;
         _cts = new CancellationTokenSource();
         _worker = Task.Run(() => RunLoop(_cts.Token));
@@ -136,35 +142,46 @@ public class AutomationEngine : IDisposable
 
             if (_enabled)
             {
-                var cycle = Interlocked.Increment(ref _cycleNumber);
-                var sw = Stopwatch.StartNew();
-                var rulesEvaluated = 0;
-                var rulesTriggered = 0;
-
-                try
-                {
-                    var activeRules = cfg.Rules.Where(r => r.Enabled && r.IsRunning).ToList();
-                    _log.Debug("Cycle", $"[C{cycle}] Begin — {activeRules.Count} active rules, interval={interval}ms");
-
-                    foreach (var rule in activeRules)
-                    {
-                        if (ct.IsCancellationRequested) break;
-                        rulesEvaluated++;
-                        if (ProcessRule(rule, cycle))
-                            rulesTriggered++;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log.Error("Engine", $"[C{cycle}] Unhandled: {ex.GetType().Name}: {ex.Message}");
-                }
-
-                sw.Stop();
-                _log.Debug("Cycle", $"[C{cycle}] End — {rulesEvaluated} evaluated, {rulesTriggered} triggered, {sw.ElapsedMilliseconds}ms");
+                await ProcessRulesOnceAsync().ConfigureAwait(false);
             }
 
             await Task.Delay(interval, ct).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Processes all active rules exactly once (one cycle).  
+    /// Called by the internal polling loop and also exposed for integration tests
+    /// that need deterministic, single-cycle execution without waiting for timers.
+    /// </summary>
+    public async Task<(int Evaluated, int Triggered)> ProcessRulesOnceAsync()
+    {
+        var cfg = _config.GetConfig();
+        var cycle = Interlocked.Increment(ref _cycleNumber);
+        var sw = Stopwatch.StartNew();
+        var rulesEvaluated = 0;
+        var rulesTriggered = 0;
+
+        try
+        {
+            var activeRules = cfg.Rules.Where(r => r.Enabled && r.IsRunning).ToList();
+            _log.Debug("Cycle", $"[C{cycle}] Begin — {activeRules.Count} active rules");
+
+            foreach (var rule in activeRules)
+            {
+                rulesEvaluated++;
+                if (await ProcessRuleAsync(rule, cycle).ConfigureAwait(false))
+                    rulesTriggered++;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Error("Engine", $"[C{cycle}] Unhandled: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        sw.Stop();
+        _log.Debug("Cycle", $"[C{cycle}] End — {rulesEvaluated} evaluated, {rulesTriggered} triggered, {sw.ElapsedMilliseconds}ms");
+        return (rulesEvaluated, rulesTriggered);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -175,7 +192,7 @@ public class AutomationEngine : IDisposable
     /// Processes a single rule: finds matching elements and executes actions.
     /// Returns true if the rule triggered an action this cycle.
     /// </summary>
-    private bool ProcessRule(Rule rule, long cycle)
+    private async Task<bool> ProcessRuleAsync(Rule rule, long cycle)
     {
         var tag = $"[C{cycle}][{rule.Name}]";
 
@@ -239,6 +256,14 @@ public class AutomationEngine : IDisposable
             try
             {
                 element = FindElement(window, rule);
+
+                // PreScroll: if no element found and PreScrollDirection is set,
+                // scroll the window and re-scan. This forces Electron/Chromium apps
+                // to render off-viewport content into the UIA tree.
+                if (element == null && !string.IsNullOrEmpty(rule.PreScrollDirection))
+                {
+                    element = PreScrollAndRescan(window, rule, tag);
+                }
             }
             catch (Exception ex)
             {
@@ -294,7 +319,7 @@ public class AutomationEngine : IDisposable
 
             // Execute action
             var actionSw = Stopwatch.StartNew();
-            ExecuteAction(rule, element, window);
+            await ExecuteActionAsync(rule, element, window).ConfigureAwait(false);
             actionSw.Stop();
             _log.Debug("Perf", $"{tag} Action '{rule.Action}' took {actionSw.ElapsedMilliseconds}ms");
             
@@ -303,11 +328,29 @@ public class AutomationEngine : IDisposable
             rule.LastTriggered = DateTime.Now;
             rule.TriggerCount++;
             rule.SessionExecutionCount++;  // In-memory session count
-            
+
+            // Fire PropertyChanged on UI thread so WPF bindings update correctly
+            try
+            {
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+                {
+                    rule.OnPropertyChanged(nameof(Rule.TriggerCount));
+                    rule.OnPropertyChanged(nameof(Rule.LastTriggered));
+                });
+            }
+            catch { /* App shutting down — safe to ignore */ }
+
             // Debounce config saves — avoid disk I/O on every trigger
             if ((DateTime.UtcNow - _lastConfigSave).TotalMilliseconds > ConfigSaveDebounceMs)
             {
-                _config.SaveConfig(_config.GetConfig());
+                try
+                {
+                    _config.SaveConfig(_config.GetConfig());
+                }
+                catch (Exception ex)
+                {
+                    _log.Warn("Engine", $"Config save failed (will retry next cycle): {ex.Message}");
+                }
                 _lastConfigSave = DateTime.UtcNow;
             }
             
@@ -369,7 +412,7 @@ public class AutomationEngine : IDisposable
     private List<AutomationElement> FindWindows(Rule rule)
     {
         var results = new List<AutomationElement>();
-        var seen = new HashSet<int>();
+        var seen = new HashSet<long>();
 
         // Search by process name if specified
         if (!string.IsNullOrEmpty(rule.TargetApp))
@@ -395,7 +438,7 @@ public class AutomationEngine : IDisposable
                         try
                         {
                             if (proc.MainWindowHandle == IntPtr.Zero) continue;
-                            var handle = proc.MainWindowHandle.ToInt32();
+                            var handle = proc.MainWindowHandle.ToInt64();
                             if (seen.Contains(handle)) continue;
 
                             var elem = AutomationElement.FromHandle(proc.MainWindowHandle);
@@ -427,7 +470,7 @@ public class AutomationEngine : IDisposable
                     try
                     {
                         var w = all[i];
-                        var handle = w.Current.NativeWindowHandle;
+                        var handle = (long)w.Current.NativeWindowHandle;
                         if (seen.Contains(handle)) continue;
 
                         var title = w.Current.Name ?? "";
@@ -461,6 +504,21 @@ public class AutomationEngine : IDisposable
             "listitem" => ControlType.ListItem,
             "text" => ControlType.Text,
             "link" => ControlType.Hyperlink,
+            "edit" or "textbox" => ControlType.Edit,
+            "checkbox" => ControlType.CheckBox,
+            "radiobutton" => ControlType.RadioButton,
+            "combobox" or "dropdown" => ControlType.ComboBox,
+            "menuitem" => ControlType.MenuItem,
+            "menu" => ControlType.Menu,
+            "tab" or "tabitem" => ControlType.TabItem,
+            "treeitem" => ControlType.TreeItem,
+            "dataitem" or "row" => ControlType.DataItem,
+            "slider" => ControlType.Slider,
+            "window" => ControlType.Window,
+            "document" => ControlType.Document,
+            "image" => ControlType.Image,
+            "toolbar" => ControlType.ToolBar,
+            "group" => ControlType.Group,
             _ => null
         };
 
@@ -528,6 +586,24 @@ public class AutomationEngine : IDisposable
                 }
             }
 
+            // Check visibility (offscreen or invisible elements should not match)
+            try
+            {
+                if (elem.Current.IsOffscreen)
+                {
+                    if (!rule.ScrollIntoView)
+                        continue;
+
+                    // Attempt to scroll the element into view
+                    if (!TryScrollIntoView(elem, window, name))
+                        continue;
+                }
+            }
+            catch (System.Windows.Automation.ElementNotAvailableException)
+            {
+                continue;
+            }
+
             // Check enabled
             try
             {
@@ -551,6 +627,157 @@ public class AutomationEngine : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
+    // PRE-SCROLL (for Electron/Chromium apps)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Scrolls the target window in the configured direction, then re-scans for the element.
+    /// This forces Electron/Chromium apps to render off-viewport content into the UIA tree.
+    /// </summary>
+    private AutomationElement? PreScrollAndRescan(AutomationElement window, Rule rule, string tag)
+    {
+        const int maxScrollPasses = 5;
+        const int settleMs = 400;
+
+        var direction = rule.PreScrollDirection?.ToLowerInvariant();
+        if (direction is not ("down" or "up")) return null;
+
+        var amount = Math.Clamp(rule.PreScrollAmount, 1, 50);
+        var delta = direction == "down" ? -120 * amount : 120 * amount;
+
+        try
+        {
+            var rect = window.Current.BoundingRectangle;
+            if (rect.IsEmpty) return null;
+
+            var hwnd = new IntPtr(window.Current.NativeWindowHandle);
+
+            for (int pass = 1; pass <= maxScrollPasses; pass++)
+            {
+                // Move cursor to window center and scroll
+                Win32.MoveCursor((int)(rect.Left + rect.Width / 2),
+                                 (int)(rect.Top + rect.Height / 2));
+                Win32.MouseWheel(delta);
+                Thread.Sleep(settleMs);
+
+                // Re-scan after scroll
+                var element = FindElement(window, rule);
+                if (element != null)
+                {
+                    _log.Info("PreScroll", $"{tag} Found '{rule.MatchText}' after {pass} scroll pass(es) {direction}");
+                    return element;
+                }
+            }
+
+            _log.Debug("PreScroll", $"{tag} No match after {maxScrollPasses} scroll passes {direction}");
+        }
+        catch (Exception ex)
+        {
+            _log.Warn("PreScroll", $"{tag} PreScroll error: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SCROLL INTO VIEW
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Attempts to scroll an off-screen element into view using a three-tier fallback.
+    /// Returns true if the element is now on-screen.
+    /// </summary>
+    private bool TryScrollIntoView(AutomationElement element, AutomationElement window, string elementName)
+    {
+        const int maxAttempts = 3;
+        const int settleMs = 350;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            // Tier 1: ScrollItemPattern on the element itself (cleanest UIA approach)
+            try
+            {
+                if (element.TryGetCurrentPattern(ScrollItemPattern.Pattern, out var sip) && sip is ScrollItemPattern scrollItem)
+                {
+                    scrollItem.ScrollIntoView();
+                    Thread.Sleep(settleMs);
+                    if (!element.Current.IsOffscreen)
+                    {
+                        _log.Info("Scroll", $"Scrolled '{elementName}' into view via ScrollItemPattern (attempt {attempt})");
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            // Tier 2: ScrollPattern on nearest scrollable ancestor — scroll to bottom
+            try
+            {
+                var ancestor = FindScrollableAncestor(element);
+                if (ancestor != null &&
+                    ancestor.TryGetCurrentPattern(ScrollPattern.Pattern, out var sp) && sp is ScrollPattern scroll)
+                {
+                    scroll.ScrollVertical(ScrollAmount.LargeIncrement);
+                    Thread.Sleep(settleMs);
+                    if (!element.Current.IsOffscreen)
+                    {
+                        _log.Info("Scroll", $"Scrolled '{elementName}' into view via ancestor ScrollPattern (attempt {attempt})");
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            // Tier 3: Mouse wheel on the window center
+            try
+            {
+                var windowRect = window.Current.BoundingRectangle;
+                if (!windowRect.IsEmpty)
+                {
+                    var hwnd = new IntPtr(window.Current.NativeWindowHandle);
+                    Win32.SetForegroundWindow(hwnd);
+                    Thread.Sleep(100);
+                    Win32.MoveCursor((int)(windowRect.Left + windowRect.Width / 2),
+                                    (int)(windowRect.Top + windowRect.Height / 2));
+                    Win32.MouseWheel(-120 * 5); // scroll down ~5 notches
+                    Thread.Sleep(settleMs);
+                    if (!element.Current.IsOffscreen)
+                    {
+                        _log.Info("Scroll", $"Scrolled '{elementName}' into view via mouse wheel (attempt {attempt})");
+                        return true;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        _log.Debug("Scroll", $"Could not scroll '{elementName}' into view after {maxAttempts} attempts");
+        return false;
+    }
+
+    /// <summary>
+    /// Walks up the UIA tree to find the nearest ancestor that supports ScrollPattern.
+    /// </summary>
+    private static AutomationElement? FindScrollableAncestor(AutomationElement element)
+    {
+        try
+        {
+            var walker = TreeWalker.ControlViewWalker;
+            var current = walker.GetParent(element);
+            int depth = 0;
+            while (current != null && !AutomationElement.RootElement.Equals(current) && depth < 15)
+            {
+                if (current.TryGetCurrentPattern(ScrollPattern.Pattern, out _))
+                    return current;
+                current = walker.GetParent(current);
+                depth++;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
     // PATTERN MATCHING
     // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -567,8 +794,13 @@ public class AutomationEngine : IDisposable
         {
             if (useRegex)
             {
-                try { if (Regex.IsMatch(name, pattern, RegexOptions.IgnoreCase)) return true; }
-                catch { }
+                // R4.3: Use cached compiled Regex
+                var regex = _regexCache.GetOrAdd(pattern, p =>
+                {
+                    try { return new Regex(p, RegexOptions.IgnoreCase | RegexOptions.Compiled); }
+                    catch { return null; }
+                });
+                if (regex != null && regex.IsMatch(name)) return true;
             }
             else
             {
@@ -635,7 +867,7 @@ public class AutomationEngine : IDisposable
     /// Executes the configured action for a matched element via the unified async path.
     /// Routes through ExecuteRuleActionAsync for consistent DryRun, Timeline, Notification, and Plugin support.
     /// </summary>
-    private void ExecuteAction(Rule rule, AutomationElement element, AutomationElement window)
+    private async Task ExecuteActionAsync(Rule rule, AutomationElement element, AutomationElement window)
     {
         var name = "(unknown)";
         try { name = element.Current.Name ?? "(unknown)"; } catch { }
@@ -658,10 +890,10 @@ public class AutomationEngine : IDisposable
 
         // Pre-action: activate window if SendKeys (needs focus)
         if (rule.Action.Equals("sendkeys", StringComparison.OrdinalIgnoreCase))
-            _executor.ActivateWindow(window);
+            await _executor.ActivateWindowAsync(window).ConfigureAwait(false);
 
-        // Execute through the unified async path (block on it from the worker thread)
-        var success = Task.Run(() => _executor.ExecuteRuleActionAsync(rule, element, context)).GetAwaiter().GetResult();
+        // Execute through the unified async path directly (no sync-over-async)
+        var success = await _executor.ExecuteRuleActionAsync(rule, element, context).ConfigureAwait(false);
         _log.Info("Action", $"{(success ? "✓" : "✗")} '{rule.Action}' on '{name}' (Rule: {rule.Name})");
     }
 
@@ -674,6 +906,7 @@ public class AutomationEngine : IDisposable
     /// </summary>
     public void Dispose()
     {
+        _disposed = true;
         _cts?.Cancel();
         try { _worker?.Wait(1000); } catch { }
         _cts?.Dispose();

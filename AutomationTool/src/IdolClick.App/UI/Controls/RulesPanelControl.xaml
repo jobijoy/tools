@@ -1,0 +1,196 @@
+<UserControl x:Class="IdolClick.UI.Controls.RulesPanelControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource SurfaceBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Rules Toolbar -->
+        <Border Grid.Row="0" Background="{StaticResource CardBrush}" CornerRadius="6,6,0,0" Padding="8,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Search (expanded mode only) -->
+                <Border x:Name="SearchPanel" Grid.Column="0" Visibility="Collapsed" 
+                        Background="{StaticResource SurfaceBrush}" CornerRadius="4" Padding="2" Margin="0,0,8,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="4,0,4,0" FontSize="{StaticResource FontSizeCaption}" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBox x:Name="SearchTextBox" Width="120" BorderThickness="0" Background="Transparent" 
+                                 VerticalAlignment="Center" TextChanged="SearchTextBox_TextChanged" FontSize="{StaticResource FontSizeCaption}"
+                                 ToolTip="Search rules (Esc to clear)"/>
+                    </StackPanel>
+                </Border>
+                
+                <TextBlock Grid.Column="0" x:Name="RulesLabel" Text="Rules" FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold" 
+                           Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                
+                <!-- Compact buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="ImportBtn" Style="{StaticResource SmallPrimaryButton}"
+                            Click="ImportRules_Click" ToolTip="Import rules from JSON file"
+                            Visibility="Collapsed" Padding="6,3">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text=" Import" FontSize="{StaticResource FontSizeTiny}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ExportBtn" Style="{StaticResource SmallOutlineButton}"
+                            Click="ExportRules_Click" ToolTip="Export rules to JSON file"
+                            Visibility="Collapsed" Margin="4,0,0,0" Padding="6,3">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📤" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text=" Export" FontSize="{StaticResource FontSizeTiny}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Content="＋" Style="{StaticResource SmallPrimaryButton}" Click="AddRule_Click" ToolTip="Add new automation rule (Ctrl+N)" Margin="4,0,0,0"/>
+                    <Button x:Name="EditBtn" Content="✎" Style="{StaticResource SmallIconButton}" Click="EditRule_Click" ToolTip="Edit selected rule (Ctrl+E)" Visibility="Collapsed" Margin="2,0,0,0"/>
+                    <Button x:Name="DelBtn" Content="🗑" Style="{StaticResource SmallDangerButton}" Click="DeleteRule_Click" ToolTip="Delete selected rule (Del)" Visibility="Collapsed" Margin="2,0,0,0"/>
+                    <Button Content="↻" Style="{StaticResource SmallIconButton}" Click="ReloadConfig_Click" ToolTip="Reload configuration (F5)" Margin="2,0,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Rule Cards -->
+        <ListBox x:Name="RulesListView" Grid.Row="1" BorderThickness="0"
+                 SelectionMode="Single"
+                 Background="{StaticResource SurfaceBrush}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 MouseDoubleClick="RulesListView_DoubleClick"
+                 SelectionChanged="RulesListView_SelectionChanged">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="6,3,6,3"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="Card"
+                                        Background="{StaticResource CardBrush}"
+                                        CornerRadius="{StaticResource RadiusMd}"
+                                        BorderBrush="{StaticResource BorderSubtleBrush}"
+                                        BorderThickness="1">
+                                    <ContentPresenter/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                        <Setter TargetName="Card" Property="BorderThickness" Value="1.5"/>
+                                        <Setter TargetName="Card" Property="Background" Value="{StaticResource SurfaceElevatedBrush}"/>
+                                    </Trigger>
+                                    <MultiTrigger>
+                                        <MultiTrigger.Conditions>
+                                            <Condition Property="IsMouseOver" Value="True"/>
+                                            <Condition Property="IsSelected" Value="False"/>
+                                        </MultiTrigger.Conditions>
+                                        <Setter TargetName="Card" Property="Background" Value="{StaticResource SurfaceElevatedBrush}"/>
+                                    </MultiTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="10,8,10,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Status accent bar -->
+                        <Border Grid.Column="0" CornerRadius="2" Margin="0,0,10,0">
+                            <Border.Background>
+                                <SolidColorBrush Color="{Binding StatusColor}"/>
+                            </Border.Background>
+                        </Border>
+
+                        <!-- Card content -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <!-- Rule name -->
+                            <TextBlock Text="{Binding Name}"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,0,3"
+                                       ToolTip="{Binding StatusTooltip}"/>
+                            <!-- Target app → match text -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <TextBlock Text="🎯" FontSize="{StaticResource FontSizeTiny}"
+                                           VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBlock Text="{Binding TargetApp}"
+                                           FontSize="{StaticResource FontSizeTiny}"
+                                           Foreground="{StaticResource PrimaryBrush}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="100"/>
+                                <TextBlock Text="  →  "
+                                           FontSize="{StaticResource FontSizeTiny}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding MatchText}"
+                                           FontSize="{StaticResource FontSizeTiny}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="150"/>
+                            </StackPanel>
+                            <!-- Metadata chips -->
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="{StaticResource SurfaceBrush}"
+                                        CornerRadius="3" Padding="5,1" Margin="0,0,6,0">
+                                    <TextBlock Text="{Binding Action}"
+                                               FontSize="{StaticResource FontSizeTiny}"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="Medium"/>
+                                </Border>
+                                <TextBlock Text="{Binding CooldownSeconds, StringFormat='⏱ {0}s'}"
+                                           FontSize="{StaticResource FontSizeTiny}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding TriggerCount, StringFormat='# {0}'}"
+                                           FontSize="{StaticResource FontSizeTiny}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding LastTriggered, StringFormat='🕐 {0:HH:mm}', TargetNullValue=—}"
+                                           FontSize="{StaticResource FontSizeTiny}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding SessionExecutionDisplay}"
+                                           FontSize="{StaticResource FontSizeTiny}"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Right controls -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                    VerticalAlignment="Center" Margin="10,0,0,0">
+                            <CheckBox IsChecked="{Binding Enabled}"
+                                      Checked="RuleEnabled_Changed"
+                                      Unchecked="RuleEnabled_Changed"
+                                      ToolTip="Enable or disable this rule"
+                                      VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <Button Content="{Binding RunStateIcon}"
+                                    Click="RuleRunToggle_Click"
+                                    Tag="{Binding}"
+                                    Style="{StaticResource SmallIconButton}"
+                                    Width="24" Height="22"
+                                    FontSize="{StaticResource FontSizeSmall}" Padding="0"
+                                    ToolTip="{Binding RunStateTooltip}"/>
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

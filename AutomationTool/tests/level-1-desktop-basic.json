@@ -1,0 +1,95 @@
+{
+  "$schema": "../../schemas/smoke-test.schema.json",
+  "schemaVersion": 1,
+  "description": "Level 1 — Basic Desktop Application Tests. Single-step app launches and simple interactions. Validates that the agent can reliably open, interact with, and verify Windows desktop applications.",
+  "defaults": {
+    "timeoutSeconds": 120,
+    "screenshotAfterEachStep": true,
+    "delayBetweenStepsMs": 1000
+  },
+  "tests": [
+    {
+      "id": "L1-01",
+      "name": "Launch Calculator",
+      "description": "Opens Windows Calculator and verifies it is running",
+      "difficulty": "Simple",
+      "prompt": "Open the Windows Calculator application. Keep it open.",
+      "verifications": [
+        { "type": "ProcessRunning", "target": "CalculatorApp", "description": "Calculator process is running" },
+        { "type": "WindowTitleContains", "target": "Calculator", "description": "Calculator window is visible" }
+      ],
+      "cleanupProcesses": ["CalculatorApp"]
+    },
+    {
+      "id": "L1-02",
+      "name": "Calculator Addition",
+      "description": "Opens Calculator, computes 45+55=100, reads result from display",
+      "difficulty": "Simple",
+      "steps": [
+        {
+          "prompt": "Open Calculator.",
+          "screenshotAfter": true,
+          "screenshotLabel": "calc-opened",
+          "delayAfterMs": 1500
+        },
+        {
+          "prompt": "In Calculator, compute 45 + 55. Tell me the exact result from the display.",
+          "screenshotAfter": true,
+          "screenshotLabel": "calc-result"
+        }
+      ],
+      "verifications": [
+        { "type": "ResponseContains", "target": "100", "description": "Agent reports 100" },
+        { "type": "ProcessRunning", "target": "CalculatorApp", "description": "Calculator still running" }
+      ],
+      "cleanupProcesses": ["CalculatorApp"]
+    },
+    {
+      "id": "L1-03",
+      "name": "Launch Notepad and Type",
+      "description": "Opens Notepad and types a single line of text",
+      "difficulty": "Simple",
+      "prompt": "Open Notepad and type exactly this text: Hello Desktop Automation Test",
+      "verifications": [
+        { "type": "ProcessRunning", "target": "notepad", "description": "Notepad process is running" },
+        { "type": "WindowTitleContains", "target": "Notepad", "description": "Notepad window is visible" }
+      ],
+      "cleanupProcesses": ["notepad"]
+    },
+    {
+      "id": "L1-04",
+      "name": "Open Windows Settings",
+      "description": "Opens the Settings app and confirms it appeared",
+      "difficulty": "Simple",
+      "prompt": "Open the Windows Settings application.",
+      "verifications": [
+        { "type": "ProcessRunning", "target": "SystemSettings", "description": "Settings process is running" },
+        { "type": "WindowTitleContains", "target": "Settings", "description": "Settings window is visible" }
+      ],
+      "cleanupProcesses": ["SystemSettings"]
+    },
+    {
+      "id": "L1-05",
+      "name": "Launch Paint",
+      "description": "Opens Microsoft Paint and verifies the window",
+      "difficulty": "Simple",
+      "prompt": "Open Microsoft Paint application. Keep it open.",
+      "verifications": [
+        { "type": "ProcessRunning", "target": "mspaint", "description": "Paint process is running" },
+        { "type": "WindowTitleContains", "target": "Paint", "description": "Paint window is visible" }
+      ],
+      "cleanupProcesses": ["mspaint"]
+    },
+    {
+      "id": "L1-06",
+      "name": "Desktop Screenshot Capture",
+      "description": "Takes a screenshot of the full desktop and confirms creation",
+      "difficulty": "Simple",
+      "prompt": "Take a screenshot of the full desktop right now.",
+      "verifications": [
+        { "type": "ScreenshotCreated", "target": "", "description": "Screenshot file was saved" },
+        { "type": "ResponseContains", "target": "screenshot", "description": "Agent mentions screenshot in response" }
+      ]
+    }
+  ]
+}

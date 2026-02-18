@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://idolclick.dev/schemas/v1/execution-report.schema.json",
+  "$id": "https://raw.githubusercontent.com/jobijoy/IdolClick/main/schemas/execution-report.schema.json",
   "title": "IdolClick Execution Report v1",
   "description": "Machine-readable execution report produced after running a TestFlow. Designed for AI consumption — coding agents read this to determine what to fix.",
   "type": "object",
@@ -17,7 +17,7 @@
     },
     "result": {
       "type": "string",
-      "enum": ["passed", "failed", "error", "aborted"],
+      "enum": ["passed", "passed_with_warnings", "failed", "error", "aborted"],
       "description": "Overall execution result."
     },
     "failedStep": {
@@ -78,8 +78,8 @@
   "$defs": {
     "StepStatus": {
       "type": "string",
-      "enum": ["passed", "failed", "skipped", "error"],
-      "description": "Execution status of a single step."
+      "enum": ["passed", "failed", "skipped", "error", "warning"],
+      "description": "Execution status of a single step. Warning = passed but via non-deterministic path (e.g., vision fallback)."
     },
     "StepAction": {
       "type": "string",

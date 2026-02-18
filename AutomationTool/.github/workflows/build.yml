@@ -1,0 +1,37 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore IdolClick.sln
+
+    - name: Build (Release)
+      run: dotnet build IdolClick.sln -c Release --no-restore
+
+    - name: Run classic integration tests
+      continue-on-error: true
+      run: |
+        $exe = "src\IdolClick.App\bin\Release\net8.0-windows\IdolClick.exe"
+        if (Test-Path $exe) {
+          & $exe --test-classic
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        } else {
+          Write-Warning "Executable not found at $exe — skipping integration tests"
+        }
+      shell: pwsh

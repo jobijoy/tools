@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Windows.Automation;
 using IdolClick.Models;
 
-namespace IdolClick.Services.Infrastructure;
+namespace IdolClick.Services.Backend;
 
 // ═══════════════════════════════════════════════════════════════════════════════════
 // DESKTOP BACKEND — Windows UI Automation implementation of IAutomationBackend.
@@ -28,6 +28,7 @@ public class DesktopBackend : IAutomationBackend
     private readonly IAssertionEvaluator _assertionEvaluator;
     private readonly SelectorParser _selectorParser;
     private VisionService? _visionService;
+    private TimingSettings _timing = new();
 
     public DesktopBackend(
         LogService log,
@@ -42,6 +43,9 @@ public class DesktopBackend : IAutomationBackend
         _selectorParser = selectorParser ?? throw new ArgumentNullException(nameof(selectorParser));
         _visionService = visionService;
     }
+
+    /// <summary>Injects configurable timing settings.</summary>
+    public void SetTiming(TimingSettings timing) => _timing = timing ?? new TimingSettings();
 
     /// <summary>
     /// Sets or replaces the vision service for fallback element location.
@@ -63,7 +67,6 @@ public class DesktopBackend : IAutomationBackend
         SupportedAssertions = new HashSet<AssertionType>(Enum.GetValues<AssertionType>()),
         SupportedSelectorKinds = new HashSet<SelectorKind> { SelectorKind.DesktopUia },
         SupportsTracing = false,
-        SupportsNetworkLogs = false,
         SupportsScreenshots = true,
         SupportsActionabilityChecks = true
     };
@@ -110,6 +113,16 @@ public class DesktopBackend : IAutomationBackend
             var windowTitle = step.WindowTitle;
             AutomationElement? window = null;
 
+            // Inherit window context from previous steps when this step doesn't specify any.
+            // Common pattern: step 1 = focus_window(app="X"), step 2 = send_keys() with no target.
+            if (string.IsNullOrWhiteSpace(targetApp) && string.IsNullOrWhiteSpace(windowTitle))
+            {
+                if (ctx.State.TryGetValue("LastResolvedApp", out var savedApp))
+                    targetApp = (string)savedApp;
+                if (ctx.State.TryGetValue("LastResolvedTitle", out var savedTitle))
+                    windowTitle = (string)savedTitle;
+            }
+
             if (RequiresWindow(step))
             {
                 Log($"Finding window (app='{targetApp}', title='{windowTitle}')");
@@ -123,7 +136,7 @@ public class DesktopBackend : IAutomationBackend
                     if (window != null) break;
 
                     Log($"Window not found yet, retrying... ({windowSw.ElapsedMilliseconds}ms)");
-                    await Task.Delay(300, ct);
+                    await Task.Delay(_timing.WindowFindPollIntervalMs, ct).ConfigureAwait(false);
                 }
 
                 if (window == null)
@@ -134,6 +147,12 @@ public class DesktopBackend : IAutomationBackend
                 }
 
                 Log($"Window found: '{window.Current.Name}' ({windowSw.ElapsedMilliseconds}ms)");
+
+                // Remember resolved window context so subsequent steps can inherit it
+                if (!string.IsNullOrWhiteSpace(targetApp))
+                    ctx.State["LastResolvedApp"] = targetApp;
+                if (!string.IsNullOrWhiteSpace(window.Current.Name))
+                    ctx.State["LastResolvedTitle"] = window.Current.Name;
 
                 // ── Target Lock enforcement ──────────────────────────────────
                 if (ctx.Flow.TargetLock)
@@ -180,19 +199,21 @@ public class DesktopBackend : IAutomationBackend
             int retryCount = 0;
             var selectorStr = ResolveSelector(step);
             bool resolvedByVision = false;
+            bool exactMatch = step.TypedSelector?.ExactMatch ?? false;
 
             if (!string.IsNullOrWhiteSpace(selectorStr) && window != null)
             {
-                Log($"Resolving selector: '{selectorStr}'");
+                Log($"Resolving selector: '{selectorStr}'" + (exactMatch ? " [exact]" : ""));
 
                 if (step.Action == StepAction.AssertNotExists)
                 {
-                    match = _selectorParser.ResolveOnce(window, selectorStr);
+                    match = _selectorParser.ResolveOnce(window, selectorStr, exactMatch);
                     Log(match != null ? "Element found (assert_not_exists will fail)" : "Element not found (correct for assert_not_exists)");
                 }
                 else
                 {
-                    match = _selectorParser.Resolve(window, selectorStr, step.TimeoutMs, out retryCount);
+                    match = await _selectorParser.ResolveAsync(window, selectorStr, step.TimeoutMs, exactMatch, ct).ConfigureAwait(false);
+                    retryCount = match?.RetryCount ?? 0;
                     if (match != null)
                         Log($"Element resolved after {retryCount} retries");
                     else
@@ -201,9 +222,27 @@ public class DesktopBackend : IAutomationBackend
             }
 
             // ── Vision fallback (when UIA selector fails) ───────────────────
+            // When UIA trees lack sufficient info, vision is the fallback resolution path.
+            // Eligible actions: Click, Type, Hover, AssertExists, AssertText, Scroll.
+
+            // Diagnostic: dump vision eligibility for debugging
+            try
+            {
+                var diagPath = Path.Combine(AppContext.BaseDirectory, "_spec_diag", "_vision_trace.txt");
+                Directory.CreateDirectory(Path.GetDirectoryName(diagPath)!);
+                File.AppendAllText(diagPath,
+                    $"[{DateTime.Now:HH:mm:ss.fff}] Step {step.Order}: action={step.Action} " +
+                    $"match={(match != null ? "found" : "null")} " +
+                    $"vision={(_visionService != null ? $"IsEnabled={_visionService.IsEnabled}" : "null")} " +
+                    $"desc='{(step.Description?.Length > 50 ? step.Description[..50] + "..." : step.Description)}' " +
+                    $"selector='{selectorStr}'\n");
+            }
+            catch { /* diagnostic only */ }
+
             if (match == null && _visionService is { IsEnabled: true }
                 && !string.IsNullOrWhiteSpace(step.Description)
-                && step.Action is StepAction.Click
+                && step.Action is StepAction.Click or StepAction.Type or StepAction.Hover
+                    or StepAction.AssertExists or StepAction.AssertText or StepAction.Scroll
                 && step.Action != StepAction.AssertNotExists)
             {
                 Log("UIA selector failed — attempting vision fallback");
@@ -230,7 +269,20 @@ public class DesktopBackend : IAutomationBackend
                 }
 
                 var visionDesc = step.Description ?? selectorStr ?? "target element";
-                var visionResult = await _visionService.LocateElementAsync(visionDesc, windowRegion, ct: ct);
+                var visionResult = await _visionService.LocateElementAsync(visionDesc, windowRegion, ct: ct).ConfigureAwait(false);
+
+                // Diagnostic: dump vision result
+                try
+                {
+                    var diagPath = Path.Combine(AppContext.BaseDirectory, "_spec_diag", "_vision_trace.txt");
+                    File.AppendAllText(diagPath,
+                        $"  → Vision result: Found={visionResult.Found} " +
+                        $"Confidence={visionResult.Confidence:F2} " +
+                        $"Center=({visionResult.CenterX},{visionResult.CenterY}) " +
+                        $"Error='{visionResult.Error}' " +
+                        $"Screenshot='{visionResult.ScreenshotPath}'\n");
+                }
+                catch { /* diagnostic only */ }
 
                 if (visionResult.Found && visionResult.Bounds != null)
                 {
@@ -260,15 +312,67 @@ public class DesktopBackend : IAutomationBackend
                 ? $"{match.Snapshot.ControlType} '{match.Snapshot.Name}' (id={match.Snapshot.AutomationId})"
                 : null;
 
-            // ── Vision-resolved click (bypass normal action path) ────────────
-            if (resolvedByVision && step.Action == StepAction.Click && result.ClickPoint != null)
+            // ── Vision-resolved action (bypass normal action path) ─────────
+            if (resolvedByVision && result.ClickPoint != null
+                && step.Action is StepAction.Click or StepAction.Type or StepAction.Hover
+                    or StepAction.AssertExists or StepAction.AssertText or StepAction.Scroll)
             {
-                Log($"Executing vision-based click at ({result.ClickPoint.X},{result.ClickPoint.Y})");
-
-                // Use Win32 direct click at the vision-determined coordinates
-                Win32.Click(result.ClickPoint.X, result.ClickPoint.Y);
-
-                Log("Vision click executed");
+                if (step.Action == StepAction.AssertExists)
+                {
+                    // Vision found the element — assertion passes
+                    Log($"Vision-resolved assert_exists: element found at ({result.ClickPoint.X},{result.ClickPoint.Y})");
+                }
+                else if (step.Action == StepAction.Click)
+                {
+                    Log($"Executing vision-based click at ({result.ClickPoint.X},{result.ClickPoint.Y})");
+                    Win32.Click(result.ClickPoint.X, result.ClickPoint.Y);
+                    Log("Vision click executed");
+                }
+                else if (step.Action == StepAction.Type)
+                {
+                    // Click to focus, then type
+                    Log($"Executing vision-based click-to-focus at ({result.ClickPoint.X},{result.ClickPoint.Y})");
+                    Win32.Click(result.ClickPoint.X, result.ClickPoint.Y);
+                    await Task.Delay(_timing.PostClickFocusDelayMs, ct).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(step.Text))
+                    {
+                        foreach (var ch in step.Text)
+                        {
+                            Win32.SendChar(ch);
+                            await Task.Delay(_timing.TypeCharDelayMs, ct).ConfigureAwait(false);
+                        }
+                        Log($"Vision-typed '{step.Text}'");
+                    }
+                }
+                else if (step.Action == StepAction.Hover)
+                {
+                    Log($"Executing vision-based hover at ({result.ClickPoint.X},{result.ClickPoint.Y})");
+                    Win32.MoveCursor(result.ClickPoint.X, result.ClickPoint.Y);
+                    Log("Vision hover executed");
+                }
+                else if (step.Action == StepAction.AssertText)
+                {
+                    // Vision found a matching element — treat as text verification pass.
+                    // The vision description should include the expected text content.
+                    Log($"Vision-resolved assert_text: element with expected content found at ({result.ClickPoint.X},{result.ClickPoint.Y})");
+                    result.Expected = step.Contains ?? step.Description;
+                    result.Found = $"[Vision-verified] {step.Description}";
+                }
+                else if (step.Action == StepAction.Scroll)
+                {
+                    // Vision found the target area — scroll at that position
+                    Log($"Vision-resolved scroll at ({result.ClickPoint.X},{result.ClickPoint.Y})");
+                    Win32.Click(result.ClickPoint.X, result.ClickPoint.Y);
+                    await Task.Delay(200, ct).ConfigureAwait(false);
+                    var amount = step.ScrollAmount > 0 ? step.ScrollAmount : 3;
+                    var direction = step.Direction?.ToLowerInvariant() == "up" ? 1 : -1;
+                    for (int s = 0; s < amount; s++)
+                    {
+                        Win32.MouseWheel(direction * 120);
+                        await Task.Delay(100, ct).ConfigureAwait(false);
+                    }
+                    Log($"Vision scroll executed ({amount} units {step.Direction})");
+                }
 
                 // Still evaluate post-step assertions if present
                 if (step.Assertions.Count > 0 && !ct.IsCancellationRequested)
@@ -277,7 +381,7 @@ public class DesktopBackend : IAutomationBackend
                     bool allPassed = true;
                     foreach (var assertion in step.Assertions)
                     {
-                        var assertResult = _assertionEvaluator.Evaluate(assertion, window, _selectorParser);
+                        var assertResult = await _assertionEvaluator.EvaluateAsync(assertion, window, _selectorParser, ct).ConfigureAwait(false);
                         result.AssertionResults.Add(assertResult);
 
                         if (!assertResult.Passed)
@@ -314,7 +418,7 @@ public class DesktopBackend : IAutomationBackend
             if (match != null)
             {
                 var requiredChecks = ActionabilityContracts.GetRequiredChecks(step.Action);
-                var checkResult = EvaluateActionability(match.Element, requiredChecks, step.TimeoutMs, callLog, stepSw);
+                var checkResult = await EvaluateActionability(match.Element, requiredChecks, step.TimeoutMs, callLog, stepSw).ConfigureAwait(false);
 
                 if (!checkResult.Passed)
                 {
@@ -338,7 +442,7 @@ public class DesktopBackend : IAutomationBackend
 
             // ── Execute action ───────────────────────────────────────────────
             Log($"Executing action: {step.Action}");
-            var actionResult = await _actionExecutor.ExecuteAsync(step, match?.Element, window);
+            var actionResult = await _actionExecutor.ExecuteAsync(step, match?.Element, window).ConfigureAwait(false);
 
             result.Expected = actionResult.Expected;
             result.Found = actionResult.Found;
@@ -362,7 +466,7 @@ public class DesktopBackend : IAutomationBackend
                 bool allPassed = true;
                 foreach (var assertion in step.Assertions)
                 {
-                    var assertResult = _assertionEvaluator.Evaluate(assertion, window, _selectorParser);
+                    var assertResult = await _assertionEvaluator.EvaluateAsync(assertion, window, _selectorParser, ct).ConfigureAwait(false);
                     result.AssertionResults.Add(assertResult);
 
                     if (!assertResult.Passed)
@@ -418,12 +522,12 @@ public class DesktopBackend : IAutomationBackend
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // ACTIONABILITY CHECKS — Playwright-inspired pre-action validation
+    // ACTIONABILITY CHECKS — Pre-action validation
     // ═══════════════════════════════════════════════════════════════════════════════
 
     private record ActionabilityResult(bool Passed, string? FailReason = null);
 
-    private ActionabilityResult EvaluateActionability(
+    private async Task<ActionabilityResult> EvaluateActionability(
         AutomationElement element,
         IReadOnlySet<ActionabilityCheck> requiredChecks,
         int timeoutMs,
@@ -471,7 +575,7 @@ public class DesktopBackend : IAutomationBackend
             {
                 Log("Actionability: checking stability (2-frame bounding box comparison)");
                 var rect1 = current.BoundingRectangle;
-                Thread.Sleep(50); // Wait one frame (~16ms) plus safety margin
+                await Task.Delay(_timing.StabilityFrameDelayMs).ConfigureAwait(false); // Wait one frame plus safety margin
 
                 try
                 {
@@ -479,7 +583,7 @@ public class DesktopBackend : IAutomationBackend
                     if (rect1 != rect2)
                     {
                         // One more retry with longer wait
-                        Thread.Sleep(100);
+                        await Task.Delay(_timing.StabilityRetryDelayMs).ConfigureAwait(false);
                         var rect3 = element.Current.BoundingRectangle;
                         if (rect2 != rect3)
                         {

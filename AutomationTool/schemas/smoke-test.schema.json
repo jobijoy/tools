@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/jobijoy/IdolClick/main/schemas/smoke-test.schema.json",
+  "title": "IdolClick Smoke Test File v1",
+  "description": "External parameterized smoke test definitions. Each test is a multi-step autonomous human-interaction simulation: prompts are sent to the LLM agent sequentially, screenshots are captured for verification, and cleanup runs automatically.",
+  "type": "object",
+  "required": ["schemaVersion", "tests"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Must be 1."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description of this test suite file."
+    },
+    "defaults": {
+      "$ref": "#/$defs/TestDefaults",
+      "description": "Default values applied to all tests in this file (individual tests can override)."
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/SmokeTest" },
+      "description": "One or more smoke test definitions."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "TestDefaults": {
+      "type": "object",
+      "properties": {
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 180,
+          "description": "Default per-test timeout in seconds."
+        },
+        "screenshotAfterEachStep": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, capture a screenshot after every step in every test."
+        },
+        "delayBetweenStepsMs": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000,
+          "description": "Default delay in ms between sequential prompt steps."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Difficulty": {
+      "type": "string",
+      "enum": ["Simple", "Medium", "Complex"],
+      "default": "Medium"
+    },
+    "VerificationType": {
+      "type": "string",
+      "enum": [
+        "ProcessRunning",
+        "WindowTitleContains",
+        "ResponseContains",
+        "ScreenshotCreated",
+        "ScreenshotContainsText"
+      ]
+    },
+    "Verification": {
+      "type": "object",
+      "required": ["type", "target"],
+      "properties": {
+        "type": { "$ref": "#/$defs/VerificationType" },
+        "target": {
+          "type": "string",
+          "description": "Target value — process name, window title substring, response text, or OCR text to find."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description shown in test results."
+        }
+      },
+      "additionalProperties": false
+    },
+    "TestStep": {
+      "type": "object",
+      "required": ["prompt"],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Natural-language prompt sent to the LLM agent for this step."
+        },
+        "screenshotAfter": {
+          "type": "boolean",
+          "default": false,
+          "description": "Capture a verification screenshot after this step completes."
+        },
+        "screenshotLabel": {
+          "type": "string",
+          "description": "Optional label for the screenshot file (e.g., 'after-calc-open'). Auto-generated if omitted."
+        },
+        "delayAfterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000,
+          "description": "Delay in ms after this step before the next one starts. Allows UI to settle."
+        },
+        "clearHistory": {
+          "type": "boolean",
+          "default": false,
+          "description": "Clear agent conversation history before this step. Useful for independent sub-tasks."
+        },
+        "verifications": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Verification" },
+          "description": "Optional intermediate verifications to run after this step (before moving to next)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SmokeTest": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "minLength": 1,
+          "description": "Unique test identifier (e.g., 'CUSTOM-01', 'ST-16')."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable test name."
+        },
+        "description": {
+          "type": "string",
+          "description": "What this test verifies."
+        },
+        "difficulty": {
+          "$ref": "#/$defs/Difficulty"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 10,
+          "description": "Max time for the entire test (all steps). Overrides defaults."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Single-step shorthand: when set, equivalent to steps: [{ prompt: <this> }]. Mutually exclusive with 'steps'."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/TestStep" },
+          "description": "Multi-step prompts executed sequentially. Mutually exclusive with 'prompt'."
+        },
+        "verifications": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Verification" },
+          "description": "Post-execution verifications. All must pass for the test to pass."
+        },
+        "cleanupProcesses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Process names to kill after the test (pre-test cleanup also kills these)."
+        }
+      },
+      "oneOf": [
+        { "required": ["prompt"] },
+        { "required": ["steps"] }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -24,7 +24,7 @@
     <Product>IdolClick</Product>
     <Description>IdolClick – Smart Windows UI automation from your system tray. Rule-based automation for clicking buttons, sending keys, and running scripts.</Description>
     <Copyright>Copyright © 2026 IdolClick Contributors</Copyright>
-    <RepositoryUrl>https://github.com/jobijoy/tools</RepositoryUrl>
+    <RepositoryUrl>https://github.com/jobijoy/IdolClick</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>automation;windows;ui;tray;wpf</PackageTags>
     
@@ -34,6 +34,9 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
+
+    <!-- Kestrel API host (embedded REST + SignalR for external integration) -->
+    <KestrelServerPort>0</KestrelServerPort>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,10 +46,17 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.3.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
-    <PackageReference Include="System.Windows.Extensions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3719.77" />
+    <PackageReference Include="ModelContextProtocol" Version="0.8.0-preview.1" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="System.Windows.Extensions" Version="10.0.3" />
+
+    <!-- ASP.NET Core (Kestrel + SignalR) — framework ref, no extra NuGet -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="WPF-UI" Version="4.2.0" />
     <!-- PowerShell executed via process spawn - no SDK needed, saves ~80MB -->
     <Reference Include="UIAutomationClient">
       <HintPath>C:\Windows\Microsoft.NET\assembly\GAC_MSIL\UIAutomationClient\v4.0_4.0.0.0__31bf3856ad364e35\UIAutomationClient.dll</HintPath>
@@ -63,6 +73,14 @@
     <None Update="Plugins\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="schemas\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Static file output (if any) -->
+  <ItemGroup>
+    <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" Condition="Exists('wwwroot')" />
   </ItemGroup>
 
 </Project>

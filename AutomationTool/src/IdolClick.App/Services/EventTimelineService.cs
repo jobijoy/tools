@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using System.Timers;
 
 namespace IdolClick.Services;
 
@@ -14,6 +15,7 @@ public class EventTimelineService : IDisposable
     private int _maxEvents = 1000;
     private string? _persistPath;
     private bool _isDisposed;
+    private System.Timers.Timer? _saveDebounceTimer;
 
     public EventTimelineService(LogService log)
     {
@@ -158,7 +160,7 @@ public class EventTimelineService : IDisposable
     {
         lock (_lock)
         {
-            System.Windows.Application.Current?.Dispatcher.Invoke(() => _events.Clear());
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _events.Clear());
         }
     }
 
@@ -188,8 +190,8 @@ public class EventTimelineService : IDisposable
     {
         lock (_lock)
         {
-            // Add to collection on UI thread
-            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            // Add to collection on UI thread (non-blocking)
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
             {
                 _events.Insert(0, evt);
 
@@ -202,12 +204,24 @@ public class EventTimelineService : IDisposable
 
             OnEvent?.Invoke(evt);
 
-            // Persist if enabled
+            // Debounced persist — coalesce rapid events into a single write
             if (!string.IsNullOrEmpty(_persistPath))
             {
-                SaveToFile();
+                ScheduleDebouncedSave();
             }
         }
+    }
+
+    private void ScheduleDebouncedSave()
+    {
+        if (_saveDebounceTimer == null)
+        {
+            _saveDebounceTimer = new System.Timers.Timer(2000) { AutoReset = false };
+            _saveDebounceTimer.Elapsed += (_, _) => SaveToFile();
+        }
+        // Reset the timer — this coalesces rapid events
+        _saveDebounceTimer.Stop();
+        _saveDebounceTimer.Start();
     }
 
     private void LoadFromFile()
@@ -218,7 +232,7 @@ public class EventTimelineService : IDisposable
             var events = JsonSerializer.Deserialize<List<AutomationEvent>>(json);
             if (events != null)
             {
-                System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
                 {
                     foreach (var evt in events.Take(_maxEvents))
                     {
@@ -252,6 +266,8 @@ public class EventTimelineService : IDisposable
         if (_isDisposed) return;
         _isDisposed = true;
 
+        _saveDebounceTimer?.Stop();
+        _saveDebounceTimer?.Dispose();
         if (!string.IsNullOrEmpty(_persistPath))
         {
             SaveToFile();

@@ -6,6 +6,9 @@ obj/
 *.cache
 *.vs/
 
+## Local key-value store (never commit)
+**/.kv/
+
 ## Build results
 [Dd]ebug/
 [Rr]elease/
@@ -112,3 +115,6 @@ $RECYCLE.BIN/
 TestResults/
 *.trx
 coverage/
+
+## IdolClick test specs and reports (generated, not part of the app)
+AutomationTool/tests/

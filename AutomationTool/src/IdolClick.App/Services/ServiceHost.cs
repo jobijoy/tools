@@ -1,6 +1,6 @@
 using System.IO;
 using IdolClick.Models;
-using IdolClick.Services.Infrastructure;
+using IdolClick.Services.Backend;
 
 namespace IdolClick.Services;
 
@@ -99,12 +99,18 @@ public class ServiceHost : IDisposable
         var vision = new VisionService(config, log);
 
         var flowValidator = new FlowValidatorService(log);
+        var timing = config.GetConfig().Timing;
         var ruleExecutor = new ActionExecutor(log);
+        ruleExecutor.SetTiming(timing);
         var flowActionExecutor = new FlowActionExecutor(log, ruleExecutor);
+        flowActionExecutor.SetTiming(timing);
         var assertionEvaluator = new AssertionEvaluator(log);
         var selectorParser = new SelectorParser(log);
+        selectorParser.SetCacheTtl(timing.SelectorCacheTtlMs);
+        selectorParser.SetTiming(timing);
 
         var backend = new DesktopBackend(log, flowActionExecutor, assertionEvaluator, selectorParser, vision);
+        backend.SetTiming(timing);
         var flowExecutor = new StepExecutor(log, flowValidator, backend);
 
         var reports = new ReportService(log);
@@ -143,13 +149,39 @@ public class ServiceHost : IDisposable
         Console.WriteLine($"IdolClick v{Version} — AI-Compatible Deterministic UI Execution Runtime");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  IdolClick.exe                     Launch GUI (default)");
-        Console.WriteLine("  IdolClick.exe --version           Print version info");
-        Console.WriteLine("  IdolClick.exe --help              Print this help message");
+        Console.WriteLine("  IdolClick.exe                             Launch GUI (default)");
+        Console.WriteLine("  IdolClick.exe --version                   Print version info");
+        Console.WriteLine("  IdolClick.exe --help                      Print this help message");
         Console.WriteLine();
-        Console.WriteLine("Future (v1.1):");
-        Console.WriteLine("  IdolClick.exe run <flow.json>     Execute a flow and exit");
-        Console.WriteLine("  IdolClick.exe validate <flow.json> Validate flow without executing");
+        Console.WriteLine("Smoke Tests (headless):");
+        Console.WriteLine("  IdolClick.exe --smoke                     Run ALL built-in smoke tests, log to default file");
+        Console.WriteLine("  IdolClick.exe --smoke ST-01,ST-05,ST-15   Run specific tests by ID (comma-separated)");
+        Console.WriteLine("  IdolClick.exe --smoke --file <path.json>  Run tests from an external JSON file");
+        Console.WriteLine("  IdolClick.exe --smoke --log <path>        Write incremental log to a custom file path");
+        Console.WriteLine("  IdolClick.exe --smoke --file suite.json --log C:\\out\\result.txt");
+        Console.WriteLine("  IdolClick.exe --smoke --file suite.json ST-01,ST-03   Run only matched IDs from file");
+        Console.WriteLine();
+        Console.WriteLine("  External test files use the smoke-test.schema.json format.");
+        Console.WriteLine("  Each test can define multi-step sequential prompts with screenshots.");
+        Console.WriteLine("  The smoke log file is written incrementally (auto-flush) so you can");
+        Console.WriteLine("  tail it in real time:  Get-Content <logfile> -Wait");
+        Console.WriteLine();
+        Console.WriteLine("MCP Server (for IDE / coding agent integration):");
+        Console.WriteLine("  IdolClick.exe --mcp                       Start MCP server on stdio transport");
+        Console.WriteLine("  IdolClick.exe --mcp --config <path>       Start MCP server with custom config");
+        Console.WriteLine();
+        Console.WriteLine("  Register in VS Code: add to .vscode/mcp.json or Copilot settings.");
+        Console.WriteLine("  Tools: idolclick_list_windows, idolclick_run_test_spec, etc.");
+        Console.WriteLine();
+        Console.WriteLine("Classic Engine Tests:");
+        Console.WriteLine("  IdolClick.exe --test-classic               Run classic rule engine integration tests");
+        Console.WriteLine();
+        Console.WriteLine("Demo Mode:");
+        Console.WriteLine("  IdolClick.exe --demo                       Launch live demo (Calculator, Notepad, rule engine)");
+        Console.WriteLine();
+        Console.WriteLine("Future:");
+        Console.WriteLine("  IdolClick.exe run <flow.json>             Execute a flow and exit");
+        Console.WriteLine("  IdolClick.exe validate <flow.json>        Validate flow without executing");
         Console.WriteLine();
         Console.WriteLine("Documentation: See PRODUCT.md for full specification.");
     }

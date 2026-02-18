@@ -1,0 +1,161 @@
+<Window x:Class="IdolClick.UI.HomeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="IdolClick"
+        Width="800" Height="540"
+        MinWidth="520" MinHeight="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        SizeChanged="Window_SizeChanged">
+
+    <Border Background="{StaticResource BackgroundBrush}" CornerRadius="12"
+            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Custom title bar -->
+            <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}"
+                    CornerRadius="12,12,0,0" Padding="16,10"
+                    MouseLeftButtonDown="TitleBar_MouseDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="⚙" FontSize="14" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="IdolClick" Foreground="{StaticResource TextBrush}"
+                                   FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Text="  •  Choose your mode" Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="11" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" Click="Close_Click"
+                            Style="{StaticResource SmallIconButton}" FontSize="12" Padding="6,2"/>
+                </Grid>
+            </Border>
+
+            <!-- Header -->
+            <StackPanel Grid.Row="1" Margin="36,22,36,4">
+                <TextBlock Text="Smart Desktop Automation" Foreground="{StaticResource TextBrush}"
+                           FontSize="22" FontWeight="Light"/>
+                <TextBlock Text="Each mode loads only the services it needs — Classic starts in under a second."
+                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <!-- Feature cards -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Margin="0" Padding="0">
+            <UniformGrid x:Name="CardsGrid" Columns="3" Margin="24,12,24,0">
+
+                <!-- ═══ Classic (Instinct) ═══ -->
+                <Border x:Name="CardClassic" Margin="10" CornerRadius="10" Cursor="Hand"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1.5"
+                        MouseLeftButtonDown="Card_Click" Tag="Classic">
+                    <Grid>
+                        <!-- Accent bar at top -->
+                        <Border Height="3" VerticalAlignment="Top" CornerRadius="10,10,0,0"
+                                Background="{StaticResource AccentBrush}"/>
+                        <StackPanel Margin="16,16">
+                            <TextBlock Text="⚡" FontSize="32" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                            <TextBlock Text="Instinct" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
+                                       Margin="0,10,0,2"/>
+                            <TextBlock Text="Classic Rule Engine" FontSize="{StaticResource FontSizeSmall}"
+                                       Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"
+                                       FontWeight="Medium" Margin="0,0,0,10"/>
+                            <TextBlock TextWrapping="Wrap" TextAlignment="Center" FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" LineHeight="17">
+                                Auto-click buttons, monitor windows, and execute rules with zero AI. Pure deterministic automation.
+                            </TextBlock>
+                            <TextBlock Text="No API key needed" FontSize="{StaticResource FontSizeSmall}" Margin="0,8,0,0"
+                                       Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"
+                                       FontStyle="Italic"/>
+                            <Button Content="Launch  →" Margin="0,10,0,0" Click="Launch_Click" Tag="Classic"
+                                    Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ═══ Agent (Reason) ═══ -->
+                <Border x:Name="CardAgent" Margin="10" CornerRadius="10" Cursor="Hand"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1.5"
+                        MouseLeftButtonDown="Card_Click" Tag="Agent">
+                    <Grid>
+                        <Border Height="3" VerticalAlignment="Top" CornerRadius="10,10,0,0"
+                                Background="{StaticResource PrimaryBrush}"/>
+                        <StackPanel Margin="16,16">
+                            <TextBlock Text="🧠" FontSize="32" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                            <TextBlock Text="Reason" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
+                                       Margin="0,10,0,2"/>
+                            <TextBlock Text="AI Agent Mode" FontSize="{StaticResource FontSizeSmall}"
+                                       Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"
+                                       FontWeight="Medium" Margin="0,0,0,10"/>
+                            <TextBlock TextWrapping="Wrap" TextAlignment="Center" FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" LineHeight="17">
+                                Chat with an AI that sees your desktop and acts on your behalf. Natural language automation.
+                            </TextBlock>
+                            <TextBlock Text="Requires LLM API key" FontSize="{StaticResource FontSizeSmall}" Margin="0,8,0,0"
+                                       Foreground="{StaticResource WarningBrush}" HorizontalAlignment="Center"
+                                       FontStyle="Italic"/>
+                            <Button Content="Launch  →" Margin="0,10,0,0" Click="Launch_Click" Tag="Agent"
+                                    Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ═══ Teach ═══ -->
+                <Border x:Name="CardTeach" Margin="10" CornerRadius="10" Cursor="Hand"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1.5"
+                        MouseLeftButtonDown="Card_Click" Tag="Teach">
+                    <Grid>
+                        <Border Height="3" VerticalAlignment="Top" CornerRadius="10,10,0,0"
+                                Background="{StaticResource WarningBrush}"/>
+                        <StackPanel Margin="16,16">
+                            <TextBlock Text="🎯" FontSize="32" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                            <TextBlock Text="Teach" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
+                                       Margin="0,10,0,2"/>
+                            <TextBlock Text="Smart Sentence Builder" FontSize="{StaticResource FontSizeSmall}"
+                                       Foreground="{StaticResource WarningBrush}" HorizontalAlignment="Center"
+                                       FontWeight="Medium" Margin="0,0,0,10"/>
+                            <TextBlock TextWrapping="Wrap" TextAlignment="Center" FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" LineHeight="17">
+                                Build reusable automation flows step by step. Record, refine, and replay with precision.
+                            </TextBlock>
+                            <TextBlock Text="Requires LLM API key" FontSize="{StaticResource FontSizeSmall}" Margin="0,8,0,0"
+                                       Foreground="{StaticResource WarningBrush}" HorizontalAlignment="Center"
+                                       FontStyle="Italic"/>
+                            <Button Content="Launch  →" Margin="0,10,0,0" Click="Launch_Click" Tag="Teach"
+                                    Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+            </UniformGrid>
+            </ScrollViewer>
+
+            <!-- Footer -->
+            <Grid Grid.Row="3" Margin="36,8,36,14">
+                <CheckBox x:Name="RememberCheck" IsChecked="True"
+                          Content="  Remember my choice and skip this screen next time"
+                          Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                          VerticalContentAlignment="Center"/>
+                <TextBlock x:Name="VersionText" HorizontalAlignment="Right"
+                           Foreground="{StaticResource TextMutedBrush}" FontSize="{StaticResource FontSizeSmall}" VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- Resize grip (bottom-right) -->
+            <Path Grid.Row="3" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                  Margin="0,0,6,4" Data="M 0,12 L 12,0 M 4,12 L 12,4 M 8,12 L 12,8"
+                  Stroke="{StaticResource BorderBrush}" StrokeThickness="1" Opacity="0.5"/>
+        </Grid>
+    </Border>
+</Window>

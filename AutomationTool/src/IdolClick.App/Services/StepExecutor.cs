@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using IdolClick.Models;
-using IdolClick.Services.Infrastructure;
+using IdolClick.Services.Backend;
 
 namespace IdolClick.Services;
 
@@ -12,9 +12,9 @@ namespace IdolClick.Services;
 //
 // Pipeline: FlowValidator → StepExecutor → IAutomationBackend.ExecuteStepAsync
 //
-// Each backend (DesktopBackend, PlaywrightBackend) owns:
+// Each backend (DesktopBackend) owns:
 //   • Selector resolution
-//   • Actionability checks (Playwright-inspired per-action contract)
+//   • Actionability checks (pre-action contract)
 //   • Action execution
 //   • Post-step assertion evaluation
 //   • Backend call logging
@@ -26,8 +26,8 @@ namespace IdolClick.Services;
 //   • Report generation
 //   • Live progress callbacks
 //
-// Backward compatibility: The 4-parameter constructor still works for direct use.
-// The new 3-parameter constructor takes an IAutomationBackend.
+// Backward compatibility: The legacy 5-parameter constructor was removed in
+// Entropy R5 — all callers now use the 3-parameter IAutomationBackend constructor.
 // ═══════════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
@@ -45,13 +45,8 @@ public class StepExecutor
     private readonly FlowValidatorService _validator;
     private readonly IAutomationBackend _backend;
 
-    // Legacy fields — kept for backward compat in case anything references them
-    private readonly IFlowActionExecutor? _actionExecutor;
-    private readonly IAssertionEvaluator? _assertionEvaluator;
-    private readonly SelectorParser? _selectorParser;
-
     /// <summary>
-    /// Sprint 7 constructor: Uses IAutomationBackend for step execution.
+    /// Creates a StepExecutor backed by the given automation backend.
     /// </summary>
     public StepExecutor(
         LogService log,
@@ -61,27 +56,6 @@ public class StepExecutor
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
         _backend = backend ?? throw new ArgumentNullException(nameof(backend));
-    }
-
-    /// <summary>
-    /// Legacy constructor: Creates a DesktopBackend internally from the 3-layer components.
-    /// Maintained for backward compatibility with existing wiring code.
-    /// </summary>
-    public StepExecutor(
-        LogService log,
-        FlowValidatorService validator,
-        IFlowActionExecutor actionExecutor,
-        IAssertionEvaluator assertionEvaluator,
-        SelectorParser selectorParser)
-    {
-        _log = log ?? throw new ArgumentNullException(nameof(log));
-        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
-        _actionExecutor = actionExecutor;
-        _assertionEvaluator = assertionEvaluator;
-        _selectorParser = selectorParser;
-
-        // Wrap legacy components in DesktopBackend
-        _backend = new DesktopBackend(log, actionExecutor, assertionEvaluator, selectorParser);
     }
 
     /// <summary>
@@ -223,7 +197,7 @@ public class StepExecutor
                 StepIndex = i,
                 TotalSteps = orderedSteps.Count
             };
-            var stepResult = await _backend.ExecuteStepAsync(step, ctx, cancellationToken);
+            var stepResult = await _backend.ExecuteStepAsync(step, ctx, cancellationToken).ConfigureAwait(false);
             report.Steps.Add(stepResult);
 
             // Track first failure

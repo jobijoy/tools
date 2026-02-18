@@ -115,7 +115,7 @@
                                 <ComboBoxItem Content="csharp"/>
                             </ComboBox>
                             <Label Content="Script Code (or file path)" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBox x:Name="ScriptBox" AcceptsReturn="True" Height="100" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,0,0,10"/>
+                            <TextBox x:Name="ScriptBox" AcceptsReturn="True" Height="100" VerticalScrollBarVisibility="Auto" FontFamily="{StaticResource MonoFont}" Margin="0,0,0,10"/>
                             <Button Content="📂 Browse..." Style="{StaticResource ModernButton}" Click="BrowseScript_Click" HorizontalAlignment="Left" Margin="0,0,0,10"/>
                         </StackPanel>
 
@@ -129,7 +129,7 @@
                         <StackPanel x:Name="PluginPanel" Visibility="Collapsed">
                             <Label Content="Plugin" Foreground="{StaticResource TextSecondaryBrush}"/>
                             <ComboBox x:Name="PluginCombo" Margin="0,0,0,10" DisplayMemberPath="Name" SelectedValuePath="Id"/>
-                            <TextBlock x:Name="PluginDescriptionText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="11"/>
+                            <TextBlock x:Name="PluginDescriptionText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="{StaticResource FontSizeCaption}"/>
                         </StackPanel>
 
                         <CheckBox x:Name="DryRunCheck" Content="Dry Run (log only, no action)" Margin="0,10,0,0"/>
@@ -152,7 +152,7 @@
                             <Label Content="Message Template" Foreground="{StaticResource TextSecondaryBrush}"/>
                             <TextBox x:Name="NotificationMessageBox" Text="Rule '{RuleName}' triggered: {MatchedText}" Margin="0,0,0,5"/>
                             <TextBlock Text="Placeholders: {RuleName}, {MatchedText}, {WindowTitle}, {ProcessName}, {TriggerTime}, {Action}" 
-                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" Margin="0,0,0,10"/>
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeSmall}" Margin="0,0,0,10"/>
 
                             <!-- Webhook Options -->
                             <StackPanel x:Name="WebhookOptionsPanel" Visibility="Collapsed">

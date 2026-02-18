@@ -5,10 +5,12 @@ namespace IdolClick.Models;
 /// </summary>
 public enum AppMode
 {
-    /// <summary>Classic rule-based automation engine.</summary>
+    /// <summary>Instinct — automatic rule-based background automation (reflexes).</summary>
     Classic,
-    /// <summary>AI agent mode with natural language interaction.</summary>
-    Agent
+    /// <summary>Reason — AI agent mode with natural language interaction (deliberate thinking).</summary>
+    Agent,
+    /// <summary>Teach — Smart Sentence Builder for creating reusable automations (learning).</summary>
+    Teach
 }
 
 /// <summary>
@@ -35,6 +37,12 @@ public class AppConfig
     /// Collection of automation rules to evaluate each polling cycle.
     /// </summary>
     public List<Rule> Rules { get; set; } = [];
+
+    /// <summary>
+    /// Centralized timing constants for the execution pipeline.
+    /// Externalizes magic numbers so they can be tuned without recompilation.
+    /// </summary>
+    public TimingSettings Timing { get; set; } = new();
 }
 
 /// <summary>
@@ -48,6 +56,12 @@ public class GlobalSettings
     /// Current application operating mode: Classic (rules) or Agent (AI).
     /// </summary>
     public AppMode Mode { get; set; } = AppMode.Classic;
+
+    /// <summary>
+    /// When true, the Home screen is skipped and the app launches directly into
+    /// the saved <see cref="Mode"/>. Set by the Home screen's "Remember my choice" checkbox.
+    /// </summary>
+    public bool SkipHomeScreen { get; set; }
     
     // === Core Automation ===
     
@@ -193,10 +207,23 @@ public class AgentSettings
     public int MaxTokens { get; set; } = 4096;
     
     /// <summary>
-    /// Sampling temperature. Set to 0 to omit (use model default).
+    /// Sampling temperature. Set to 0 for maximum determinism.
+    /// Value 1.0 is omitted (lets the model use its default).
     /// Some models (e.g. o-series, gpt-5.2) only support the default value.
     /// </summary>
     public double Temperature { get; set; } = 0;
+
+    /// <summary>
+    /// Maximum number of messages to keep in the conversation history before compaction.
+    /// Older tool-call/result pairs are summarized to save tokens. Default: 40.
+    /// </summary>
+    public int MaxHistoryMessages { get; set; } = 40;
+
+    /// <summary>
+    /// Maximum session token budget. When estimated usage exceeds this, old messages
+    /// are aggressively compacted. 0 = no limit. Default: 128000 (128k).
+    /// </summary>
+    public int MaxSessionTokens { get; set; } = 128_000;
     
     /// <summary>
     /// System prompt prepended to every agent conversation.
@@ -221,6 +248,39 @@ public class AgentSettings
     /// a vision model available at the same endpoint.
     /// </summary>
     public string VisionModelId { get; set; } = "";
+
+    // === Voice Input ===
+
+    /// <summary>
+    /// Enable voice input (microphone button) in the chat UI.
+    /// Requires a Whisper deployment on the Azure OpenAI endpoint.
+    /// </summary>
+    public bool VoiceInputEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Azure OpenAI deployment name for the Whisper model (e.g., "whisper-1").
+    /// Used for speech-to-text transcription of voice input.
+    /// </summary>
+    public string WhisperDeploymentId { get; set; } = "whisper";
+
+    /// <summary>
+    /// Optional dedicated endpoint for the Whisper API.
+    /// If empty, falls back to the main agent <see cref="Endpoint"/>.
+    /// Useful when the Whisper model is on a different Azure OpenAI resource.
+    /// </summary>
+    public string WhisperEndpoint { get; set; } = "";
+
+    /// <summary>
+    /// Optional dedicated API key for the Whisper endpoint.
+    /// If empty, falls back to the main agent <see cref="ApiKey"/>.
+    /// </summary>
+    public string WhisperApiKey { get; set; } = "";
+
+    /// <summary>
+    /// Language hint for Whisper transcription (ISO 639-1, e.g., "en", "es", "ja").
+    /// Empty or null = auto-detect language.
+    /// </summary>
+    public string VoiceLanguage { get; set; } = "";
 }
 
 /// <summary>
@@ -242,4 +302,68 @@ public class NotificationDefaults
     /// Include timestamp in notification messages.
     /// </summary>
     public bool IncludeTimestamp { get; set; } = true;
+}
+
+/// <summary>
+/// Centralized timing constants used across the execution pipeline.
+/// All values are externalized from code so they can be tuned without recompilation.
+/// Loaded from config.json under "TimingSettings".
+/// </summary>
+public class TimingSettings
+{
+    // ── Selector Resolution ──────────────────────────────────────────────
+
+    /// <summary>Poll interval when waiting for elements to appear (ms). Default: 150.</summary>
+    public int SelectorPollIntervalMs { get; set; } = 150;
+
+    /// <summary>Default element wait timeout (ms). Default: 3000.</summary>
+    public int DefaultElementTimeoutMs { get; set; } = 3000;
+
+    /// <summary>Selector cache time-to-live (ms). Default: 5000 (5s).</summary>
+    public int SelectorCacheTtlMs { get; set; } = 5000;
+
+    // ── Launch / Window ──────────────────────────────────────────────────
+
+    /// <summary>Max time to wait for a launched window to appear in UIA tree (ms). Default: 10000.</summary>
+    public int LaunchWindowTimeoutMs { get; set; } = 10000;
+
+    /// <summary>Poll interval during launch window wait (ms). Default: 150.</summary>
+    public int LaunchPollIntervalMs { get; set; } = 150;
+
+    /// <summary>Max time to wait for UIA tree stability after launch (ms). Default: 2000.</summary>
+    public int LaunchUiaStabilityMs { get; set; } = 2000;
+
+    /// <summary>Delay after WaitForInputIdle type check (ms). Default: 100.</summary>
+    public int PostClickFocusDelayMs { get; set; } = 100;
+
+    /// <summary>Delay between typed characters via SendChar (ms). Default: 20.</summary>
+    public int TypeCharDelayMs { get; set; } = 20;
+
+    // ── Navigate ─────────────────────────────────────────────────────────
+
+    /// <summary>Max time to wait for browser title to match domain hint (ms). Default: 8000.</summary>
+    public int NavigateMaxWaitMs { get; set; } = 8000;
+
+    /// <summary>Poll interval during navigate wait (ms). Default: 200.</summary>
+    public int NavigatePollIntervalMs { get; set; } = 200;
+
+    /// <summary>Extra post-navigate delay for initial page render (ms). Default: 300.</summary>
+    public int NavigatePostRenderDelayMs { get; set; } = 300;
+
+    // ── Actionability ────────────────────────────────────────────────────
+
+    /// <summary>Window find poll interval in DesktopBackend (ms). Default: 150.</summary>
+    public int WindowFindPollIntervalMs { get; set; } = 150;
+
+    /// <summary>Stability check frame delay (ms). Default: 50.</summary>
+    public int StabilityFrameDelayMs { get; set; } = 50;
+
+    /// <summary>Stability second-chance delay (ms). Default: 100.</summary>
+    public int StabilityRetryDelayMs { get; set; } = 100;
+
+    /// <summary>Minimum inter-step delay when delayAfterMs is unset (ms). Default: 100.</summary>
+    public int MinInterStepDelayMs { get; set; } = 100;
+
+    /// <summary>Post-ActivateWindow settle delay (ms). Default: 50.</summary>
+    public int ActivateWindowDelayMs { get; set; } = 50;
 }

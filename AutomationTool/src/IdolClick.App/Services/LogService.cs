@@ -35,14 +35,18 @@ public record LogEntry(DateTime Time, LogLevel Level, string Category, string Me
 /// <para>Recent entries are kept in a circular buffer for UI display.</para>
 /// <para>File writes are performed asynchronously to avoid blocking.</para>
 /// </remarks>
-public class LogService
+public class LogService : IDisposable
 {
     private readonly ConcurrentQueue<LogEntry> _buffer = new();
     private readonly string _logPath;
     private readonly string _auditPath;
-    private readonly object _fileLock = new();
     private readonly object _auditLock = new();
     private LogLevel _minLevel = LogLevel.Info;
+    
+    // R4.1: Buffered StreamWriter — avoids open/close per write
+    private StreamWriter? _writer;
+    private readonly object _writerLock = new();
+    private System.Timers.Timer? _flushTimer;
     
     /// <summary>
     /// Maximum number of log entries to keep in the memory buffer.
@@ -63,6 +67,21 @@ public class LogService
         Directory.CreateDirectory(logDir);
         _logPath = Path.Combine(logDir, $"log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
         _auditPath = Path.Combine(logDir, "audit_log.txt");
+        
+        // Open persistent writer with auto-flush disabled (we flush on timer + dispose)
+        try
+        {
+            _writer = new StreamWriter(_logPath, append: true, System.Text.Encoding.UTF8, 4096)
+            {
+                AutoFlush = false
+            };
+        }
+        catch { /* If we can't open the log file, continue without file logging */ }
+        
+        // Flush every 2 seconds to balance I/O batching with data freshness
+        _flushTimer = new System.Timers.Timer(2000) { AutoReset = true };
+        _flushTimer.Elapsed += (_, _) => FlushWriter();
+        _flushTimer.Start();
     }
 
     /// <summary>
@@ -74,6 +93,9 @@ public class LogService
 
     /// <summary>Logs a debug message.</summary>
     public void Debug(string category, string message) => Log(LogLevel.Debug, category, message);
+    
+    /// <summary>Returns true if Debug-level logging is active. Use to guard expensive string formatting.</summary>
+    public bool IsDebugEnabled => _minLevel <= LogLevel.Debug;
     
     /// <summary>Logs an informational message.</summary>
     public void Info(string category, string message) => Log(LogLevel.Info, category, message);
@@ -126,8 +148,8 @@ public class LogService
         while (_buffer.Count > MaxBufferSize) 
             _buffer.TryDequeue(out _);
 
-        // Async file write to avoid blocking
-        _ = Task.Run(() => WriteToFile(entry));
+        // R4.1: Write directly to buffered StreamWriter (no Task.Run per entry)
+        WriteToFile(entry);
         
         // Notify subscribers
         OnLog?.Invoke(entry);
@@ -151,14 +173,39 @@ public class LogService
         try
         {
             var line = $"[{e.Time:yyyy-MM-dd HH:mm:ss.fff}] {e.Level,-7} [{e.Category,-15}] {e.Message}";
-            lock (_fileLock) 
-            { 
-                File.AppendAllText(_logPath, line + Environment.NewLine); 
+            lock (_writerLock)
+            {
+                _writer?.WriteLine(line);
             }
         }
         catch 
         { 
             // Silently ignore file write errors to prevent log spam
         }
+    }
+
+    private void FlushWriter()
+    {
+        try
+        {
+            lock (_writerLock)
+            {
+                _writer?.Flush();
+            }
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        _flushTimer?.Stop();
+        _flushTimer?.Dispose();
+        lock (_writerLock)
+        {
+            _writer?.Flush();
+            _writer?.Dispose();
+            _writer = null;
+        }
+        GC.SuppressFinalize(this);
     }
 }

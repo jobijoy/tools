@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/jobijoy/IdolClick/main/schemas/test-pack.schema.json",
+  "title": "IdolClick TestPack v1",
+  "description": "Bounded, repeatable, deterministic test program with dual-perception Eye (structural + visual). Contains journeys, flows, guardrails, and execution policies.",
+  "type": "object",
+  "required": ["schemaVersion", "packId", "packName", "targets", "journeys", "flows"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version for forward compatibility."
+    },
+    "packId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique pack identifier."
+    },
+    "packName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable pack name."
+    },
+    "createdAtUtc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of pack creation."
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/PackTarget" },
+      "description": "Automation targets (web apps, desktop apps)."
+    },
+    "inputs": {
+      "$ref": "#/$defs/PackInput",
+      "description": "Instructions, project context, and documentation."
+    },
+    "guardrails": {
+      "$ref": "#/$defs/PackGuardrails",
+      "description": "Safety guardrails."
+    },
+    "dataProfiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/DataProfile" },
+      "description": "Parameterized data profiles for test input variation."
+    },
+    "coveragePlan": {
+      "$ref": "#/$defs/CoveragePlan",
+      "description": "Coverage strategy."
+    },
+    "journeys": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Journey" },
+      "description": "User-meaningful test scenarios."
+    },
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/TestFlowRef" },
+      "description": "Deterministic step sequences referenced by journeys."
+    },
+    "execution": {
+      "$ref": "#/$defs/PackExecutionConfig",
+      "description": "Execution mode, artifacts, and reporting."
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "TargetKind": {
+      "type": "string",
+      "enum": ["desktop"]
+    },
+    "PerceptionMode": {
+      "type": "string",
+      "enum": ["structural", "visual", "structural_first", "dual", "auto"],
+      "description": "How the Eye captures information. Structural = DOM/UIA (fast, deterministic). Visual = screenshot (pixel-level). Auto = engine selects per context."
+    },
+    "CapturePolicy": {
+      "type": "string",
+      "enum": ["never", "on_fail", "always"]
+    },
+    "SafetyMode": {
+      "type": "string",
+      "enum": ["strict", "standard", "permissive"]
+    },
+    "VisionFallbackPolicy": {
+      "type": "string",
+      "enum": ["disabled", "allowed_but_warning", "allowed_silent"]
+    },
+    "StepAction": {
+      "type": "string",
+      "enum": [
+        "click", "type", "send_keys", "wait",
+        "assert_exists", "assert_not_exists", "assert_text", "assert_window",
+        "navigate", "screenshot", "scroll", "focus_window", "launch"
+      ]
+    },
+
+    "PackTarget": {
+      "type": "object",
+      "required": ["targetId", "kind"],
+      "properties": {
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier referenced by flows."
+        },
+        "kind": { "$ref": "#/$defs/TargetKind" },
+        "processName": {
+          "type": "string",
+          "description": "Process name (desktop targets)."
+        },
+        "targetLock": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "windowTitleContains": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "desktop" } } },
+          "then": { "required": ["processName"] }
+        }
+      ],
+      "additionalProperties": false
+    },
+
+    "PackInput": {
+      "type": "object",
+      "properties": {
+        "instructions": {
+          "type": "string",
+          "description": "High-level test instructions (natural language)."
+        },
+        "projectContext": {
+          "type": "object",
+          "properties": {
+            "featureList": { "type": "array", "items": { "type": "string" } },
+            "routes": { "type": "array", "items": { "type": "string" } },
+            "knownRisks": { "type": "array", "items": { "type": "string" } },
+            "uiNotes": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        "documentationSources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "name"],
+            "properties": {
+              "type": { "type": "string", "enum": ["text", "markdown", "url"] },
+              "name": { "type": "string" },
+              "content": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "PackGuardrails": {
+      "type": "object",
+      "properties": {
+        "safetyMode": { "$ref": "#/$defs/SafetyMode", "default": "strict" },
+        "allowlistedProcesses": { "type": "array", "items": { "type": "string" } },
+        "forbiddenActions": { "type": "array", "items": { "type": "string" } },
+        "maxRuntimeMinutes": { "type": "integer", "minimum": 0, "default": 45 },
+        "maxJourneys": { "type": "integer", "minimum": 1, "default": 20 },
+        "maxTotalSteps": { "type": "integer", "minimum": 1, "default": 800 },
+        "maxStepsPerFlow": { "type": "integer", "minimum": 1, "default": 80 },
+        "maxFailuresBeforeStop": { "type": "integer", "minimum": 0, "default": 5 },
+        "requireTargetLockForDesktop": { "type": "boolean", "default": true },
+        "requireUserConfirmationFor": { "type": "array", "items": { "type": "string" } },
+        "visionFallbackPolicy": { "$ref": "#/$defs/VisionFallbackPolicy", "default": "allowed_but_warning" },
+        "retryPolicy": {
+          "type": "object",
+          "properties": {
+            "maxRetriesPerStep": { "type": "integer", "minimum": 0, "default": 1 },
+            "retryOn": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        "perception": { "$ref": "#/$defs/PerceptionPolicy" }
+      },
+      "additionalProperties": false
+    },
+
+    "PerceptionPolicy": {
+      "type": "object",
+      "description": "Controls how the Eye gathers evidence — structural (DOM/UIA) vs. visual (screenshot).",
+      "properties": {
+        "defaultMode": { "$ref": "#/$defs/PerceptionMode", "default": "auto" },
+        "onFailureMode": { "$ref": "#/$defs/PerceptionMode", "default": "dual" },
+        "forVisualAssertions": { "$ref": "#/$defs/PerceptionMode", "default": "visual" },
+        "uiaTreeDepth": { "type": "integer", "minimum": 0, "default": 3 },
+        "forceStructuralFor": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/StepAction" },
+          "description": "Actions that always use structural perception."
+        },
+        "forceVisualFor": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/StepAction" },
+          "description": "Actions that always capture visual evidence."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "DataProfile": {
+      "type": "object",
+      "required": ["profileId"],
+      "properties": {
+        "profileId": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "values": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "CoveragePlan": {
+      "type": "object",
+      "properties": {
+        "breadthWeight": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.6 },
+        "depthWeight": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.4 },
+        "requiredCategories": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "explorationBudget": {
+          "type": "object",
+          "properties": {
+            "extraJourneys": { "type": "integer", "minimum": 0, "default": 5 },
+            "focus": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "SuccessCriterionType": {
+      "type": "string",
+      "enum": ["structural_text", "structural_element", "desktop_text", "desktop_element", "visual_match", "custom"]
+    },
+
+    "JourneySuccessCriterion": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "$ref": "#/$defs/SuccessCriterionType" },
+        "selectorKind": { "type": "string" },
+        "selectorValue": { "type": "string" },
+        "contains": { "type": "string" },
+        "equals": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "Journey": {
+      "type": "object",
+      "required": ["journeyId", "title", "flows"],
+      "properties": {
+        "journeyId": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "priority": {
+          "type": "string",
+          "enum": ["p0", "p1", "p2", "p3"],
+          "default": "p1"
+        },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "successCriteria": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/JourneySuccessCriterion" }
+        },
+        "flows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["flowRefId"],
+            "properties": {
+              "flowRefId": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "dataProfileIds": { "type": "array", "items": { "type": "string" } },
+        "perceptionOverride": { "$ref": "#/$defs/PerceptionMode" }
+      },
+      "additionalProperties": false
+    },
+
+    "TestFlowRef": {
+      "type": "object",
+      "description": "A TestFlow embedded in the pack. Uses the test-flow schema with added pack-level fields.",
+      "required": ["flowId", "backend", "targetId", "name", "steps"],
+      "properties": {
+        "flowId": { "type": "string", "minLength": 1 },
+        "backend": { "type": "string", "enum": ["desktop-uia"] },
+        "targetId": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": ["string", "integer"] },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "targetApp": { "type": "string" },
+        "targetLock": { "type": "boolean" },
+        "timeoutSeconds": { "type": "integer", "minimum": 0 },
+        "stopOnFailure": { "type": "boolean" },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "object" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "PackExecutionConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["batch", "interactive", "dry_run"],
+          "default": "batch"
+        },
+        "artifactPolicy": {
+          "type": "object",
+          "properties": {
+            "screenshots": { "$ref": "#/$defs/CapturePolicy", "default": "on_fail" },
+            "uiaTreeSnapshot": { "$ref": "#/$defs/CapturePolicy", "default": "on_fail" }
+          },
+          "additionalProperties": false
+        },
+        "reporting": {
+          "type": "object",
+          "properties": {
+            "format": { "type": "string", "default": "pack_report_v1" },
+            "includeFixQueue": { "type": "boolean", "default": true },
+            "includeCoverageMap": { "type": "boolean", "default": true },
+            "includePerceptionMetadata": { "type": "boolean", "default": true }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

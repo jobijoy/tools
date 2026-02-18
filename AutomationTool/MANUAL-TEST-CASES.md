@@ -28,6 +28,20 @@
 
 ---
 
+## TC-02a: Classic Mode — Automated Integration Tests
+
+> **These tests are automated** and can be run via CLI:
+> ```
+> IdolClick.exe --test-classic
+> ```
+> Covers: button click (exact/prefix/regex/multi-pattern), ExcludeTexts, disabled element skipping,
+> wrong ElementType rejection, cooldown enforcement, DryRun mode, CheckBox/Any control types,
+> MaxExecutionsPerSession, WindowTitle filtering, non-existent process handling.
+>
+> **14 test cases** (TC-CLICK-01 through TC-CLICK-09, TC-TYPE-01/02, TC-SAFETY-01/02/03).
+
+---
+
 ## TC-03: Agent Mode — Chat + LLM
 
 | # | Step | Expected |
@@ -241,7 +255,7 @@ Test each of the 13 step actions individually:
 | 10 | `assert_window` | `{ "action": "assert_window", "windowTitle": "Notepad" }` | Passes if window title matches |
 | 11 | `screenshot` | `{ "action": "screenshot" }` | Screenshot saved to report |
 | 12 | `scroll` | `{ "action": "scroll", "direction": "down", "scrollAmount": 3 }` | Scrolls down |
-| 13 | `navigate` | `{ "action": "navigate", "url": "https://example.com" }` | (Playwright only — skip for desktop) |
+| 13 | `navigate` | `{ "action": "navigate", "url": "https://example.com" }` | Opens URL via shell execute (default browser) |
 
 ---
 

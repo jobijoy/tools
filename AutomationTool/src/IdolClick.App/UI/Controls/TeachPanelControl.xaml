@@ -1,0 +1,124 @@
+<UserControl x:Class="IdolClick.UI.Controls.TeachPanelControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource SurfaceBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{StaticResource CardBrush}" CornerRadius="6,6,0,0" Padding="12,8">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🎓" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="Teach" FontSize="{StaticResource FontSizeBodySm}" FontWeight="SemiBold" 
+                               Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                    <TextBlock Text="  •  Build reusable automations with smart sentences" FontSize="{StaticResource FontSizeSmall}" 
+                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="TeachClearBtn" Content="🗑" Style="{StaticResource SmallIconButton}" 
+                            Click="TeachClear_Click" ToolTip="Clear all steps" Width="24" Height="22"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- NL Input Bar -->
+        <Border Grid.Row="1" Background="{StaticResource CardBrush}" Padding="8" Margin="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TeachNLInput" Grid.Column="0" 
+                         FontSize="{StaticResource FontSizeBodySm}" Padding="10,8" 
+                         AcceptsReturn="False"
+                         TextWrapping="Wrap"
+                         MinHeight="34" MaxHeight="60"
+                         KeyDown="TeachNLInput_KeyDown"
+                         VerticalAlignment="Center">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                            <Setter Property="Tag" Value="Describe what you want to automate... e.g. 'Open Chrome and search for weather'"/>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+                <Button x:Name="TeachMicButton" Grid.Column="1" Content="🎤" 
+                        Style="{StaticResource MicButton}" 
+                        Click="TeachMicButton_Click" 
+                        Width="34" Height="34" FontSize="14" Margin="4,0,0,0"
+                        ToolTip="Voice input"
+                        VerticalAlignment="Bottom"
+                        Visibility="Collapsed"/>
+                <Button x:Name="TeachParseBtn" Grid.Column="2" Content="⚡ Parse" 
+                        Style="{StaticResource SmallPrimaryButton}" 
+                        Click="TeachParse_Click" 
+                        Height="34" Margin="4,0,0,0"
+                        ToolTip="Parse description into automation steps"
+                        VerticalAlignment="Bottom"/>
+            </Grid>
+        </Border>
+
+        <!-- Steps Area -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" 
+                      HorizontalScrollBarVisibility="Disabled"
+                      Background="{StaticResource SurfaceBrush}" Margin="0,2,0,0">
+            <StackPanel x:Name="TeachStepsPanel" Margin="8,4,8,4">
+                <StackPanel x:Name="TeachEmptyState" VerticalAlignment="Center" 
+                            HorizontalAlignment="Center" Margin="30,60">
+                    <TextBlock Text="🎓" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <TextBlock Text="Smart Sentence Builder" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold" 
+                               Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="Describe what you want to automate above, or add steps manually." 
+                               FontSize="{StaticResource FontSizeBodySm}" Foreground="{StaticResource TextSecondaryBrush}" 
+                               HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" 
+                               MaxWidth="400" Margin="0,0,0,16"/>
+                    <TextBlock FontSize="{StaticResource FontSizeCaption}" Foreground="{StaticResource TextSecondaryBrush}" 
+                               HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                               LineHeight="20">
+                        <Run Text="Examples:"/><LineBreak/>
+                        <Run Text="• &quot;Open Notepad and type Hello World&quot;" Foreground="{StaticResource AccentBrush}"/><LineBreak/>
+                        <Run Text="• &quot;Open Chrome, go to YouTube, search for music&quot;" Foreground="{StaticResource AccentBrush}"/><LineBreak/>
+                        <Run Text="• &quot;Copy text from Notepad to Word&quot;" Foreground="{StaticResource AccentBrush}"/>
+                    </TextBlock>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Action Bar -->
+        <Border Grid.Row="3" Background="{StaticResource CardBrush}" Padding="10,8" CornerRadius="0,0,6,6">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="TeachAddStepBtn" Content="＋ Add Step" 
+                            Style="{StaticResource SmallPrimaryButton}" 
+                            Click="TeachAddStep_Click" ToolTip="Add a new automation step"
+                            Height="28" Margin="0,0,6,0"/>
+                    <TextBlock x:Name="TeachValidationStatus" Text="" FontSize="{StaticResource FontSizeSmall}" 
+                               Foreground="{StaticResource TextSecondaryBrush}" 
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="TeachViewJsonBtn" Content="{}{  }" 
+                            Style="{StaticResource SmallIconButton}" 
+                            Click="TeachViewJson_Click" ToolTip="View generated TestFlow JSON"
+                            Height="28" Margin="0,0,6,0"/>
+                    <Button x:Name="TeachTestBtn" Content="▶ Test" 
+                            Style="{StaticResource SuccessButton}" 
+                            Click="TeachTest_Click" ToolTip="Validate and execute this flow"
+                            Height="28" FontSize="11" Padding="12,4" Margin="0,0,6,0"
+                            IsEnabled="False"/>
+                    <Button x:Name="TeachSaveBtn" Content="💾 Save Template" 
+                            Style="{StaticResource PrimaryButton}" 
+                            Click="TeachSave_Click" ToolTip="Save as reusable template"
+                            Height="28" FontSize="11" Padding="12,4"
+                            IsEnabled="False"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

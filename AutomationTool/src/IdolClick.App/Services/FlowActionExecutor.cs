@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
 using System.Windows.Automation;
 using IdolClick.Models;
 
@@ -52,12 +54,16 @@ public class FlowActionExecutor : IFlowActionExecutor
 {
     private readonly LogService _log;
     private readonly ActionExecutor _ruleExecutor;
+    private TimingSettings _timing = new();
 
     public FlowActionExecutor(LogService log, ActionExecutor ruleExecutor)
     {
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _ruleExecutor = ruleExecutor ?? throw new ArgumentNullException(nameof(ruleExecutor));
     }
+
+    /// <summary>Injects configurable timing settings.</summary>
+    public void SetTiming(TimingSettings timing) => _timing = timing ?? new TimingSettings();
 
     public async Task<ActionResult> ExecuteAsync(TestStep step, AutomationElement? element, AutomationElement? window)
     {
@@ -66,18 +72,19 @@ public class FlowActionExecutor : IFlowActionExecutor
             return step.Action switch
             {
                 StepAction.Click => ExecuteClick(step, element),
-                StepAction.Type => ExecuteType(step, element),
-                StepAction.SendKeys => ExecuteSendKeys(step),
-                StepAction.Wait => await ExecuteWaitAsync(step, element),
+                StepAction.Type => await ExecuteType(step, element).ConfigureAwait(false),
+                StepAction.SendKeys => await ExecuteSendKeysAsync(step).ConfigureAwait(false),
+                StepAction.Wait => await ExecuteWaitAsync(step, element).ConfigureAwait(false),
                 StepAction.AssertExists => ExecuteAssertExists(element, step.Selector),
                 StepAction.AssertNotExists => ExecuteAssertNotExists(element, step.Selector),
                 StepAction.AssertText => ExecuteAssertText(step, element),
                 StepAction.AssertWindow => ExecuteAssertWindow(step, window),
-                StepAction.Navigate => await ExecuteNavigateAsync(step),
+                StepAction.Navigate => await ExecuteNavigateAsync(step).ConfigureAwait(false),
                 StepAction.Screenshot => ExecuteScreenshot(step),
                 StepAction.Scroll => ExecuteScroll(step, element),
-                StepAction.FocusWindow => ExecuteFocusWindow(step, window),
-                StepAction.Launch => await ExecuteLaunchAsync(step),
+                StepAction.FocusWindow => await ExecuteFocusWindowAsync(step, window).ConfigureAwait(false),
+                StepAction.Launch => await ExecuteLaunchAsync(step).ConfigureAwait(false),
+                StepAction.Hover => ExecuteHover(step, element),
                 _ => new ActionResult { Success = false, Error = $"Unknown action: {step.Action}" }
             };
         }
@@ -105,7 +112,7 @@ public class FlowActionExecutor : IFlowActionExecutor
         return new ActionResult { Success = true, Diagnostics = $"Clicked '{step.Selector}'" };
     }
 
-    private ActionResult ExecuteType(TestStep step, AutomationElement? element)
+    private async Task<ActionResult> ExecuteType(TestStep step, AutomationElement? element)
     {
         if (string.IsNullOrEmpty(step.Text))
             return new ActionResult { Success = false, Error = "Type action requires text." };
@@ -116,7 +123,7 @@ public class FlowActionExecutor : IFlowActionExecutor
         if (element != null)
         {
             _ruleExecutor.ClickElement(element);
-            Thread.Sleep(100);
+            await Task.Delay(_timing.PostClickFocusDelayMs).ConfigureAwait(false);
         }
 
         // Send text character by character via SendInput Unicode (OS-level injection)
@@ -125,19 +132,19 @@ public class FlowActionExecutor : IFlowActionExecutor
         foreach (var ch in step.Text)
         {
             Win32.SendChar(ch);
-            Thread.Sleep(20);
+            await Task.Delay(_timing.TypeCharDelayMs).ConfigureAwait(false);
         }
 
         _log.Debug("FlowAction", $"Type: sent '{step.Text}' via keyboard");
         return new ActionResult { Success = true, Diagnostics = $"Typed '{step.Text}' via keyboard" };
     }
 
-    private ActionResult ExecuteSendKeys(TestStep step)
+    private async Task<ActionResult> ExecuteSendKeysAsync(TestStep step)
     {
         if (string.IsNullOrEmpty(step.Keys))
             return new ActionResult { Success = false, Error = "SendKeys action requires keys." };
 
-        _ruleExecutor.SendKeys(step.Keys);
+        await _ruleExecutor.SendKeysAsync(step.Keys).ConfigureAwait(false);
         _log.Debug("FlowAction", $"SendKeys: '{step.Keys}'");
         return new ActionResult { Success = true, Diagnostics = $"Sent keys: '{step.Keys}'" };
     }
@@ -151,7 +158,7 @@ public class FlowActionExecutor : IFlowActionExecutor
             if (string.IsNullOrWhiteSpace(step.Selector))
             {
                 // Fixed delay
-                await Task.Delay(delayMs);
+                await Task.Delay(delayMs).ConfigureAwait(false);
                 _log.Debug("FlowAction", $"Wait: fixed delay {delayMs}ms");
                 return new ActionResult { Success = true, Diagnostics = $"Waited {delayMs}ms" };
             }
@@ -253,13 +260,14 @@ public class FlowActionExecutor : IFlowActionExecutor
             // Smart wait: poll for a browser window whose title contains domain or page keywords
             var domainHint = ExtractDomainHint(step.Url);
             var sw = Stopwatch.StartNew();
-            int maxWaitMs = Math.Max(step.TimeoutMs, 8000);
-            const int pollIntervalMs = 300;
+            int maxWaitMs = Math.Max(step.TimeoutMs, _timing.NavigateMaxWaitMs);
+            int pollIntervalMs = _timing.NavigatePollIntervalMs;
             bool windowFound = false;
+            string? matchedTitle = null;
 
             while (sw.ElapsedMilliseconds < maxWaitMs)
             {
-                await Task.Delay(pollIntervalMs);
+                await Task.Delay(pollIntervalMs).ConfigureAwait(false);
 
                 // Check if any browser window title contains the domain hint
                 try
@@ -277,6 +285,7 @@ public class FlowActionExecutor : IFlowActionExecutor
                                 title.Contains(domainHint, StringComparison.OrdinalIgnoreCase))
                             {
                                 windowFound = true;
+                                matchedTitle = title;
                                 _log.Debug("FlowAction", $"Navigate: window with '{domainHint}' in title found after {sw.ElapsedMilliseconds}ms");
                                 break;
                             }
@@ -294,8 +303,19 @@ public class FlowActionExecutor : IFlowActionExecutor
                 _log.Debug("FlowAction", $"Navigate: no window with '{domainHint}' found after {sw.ElapsedMilliseconds}ms, continuing anyway");
             }
 
+            // Learn from successful navigation: persist domain→title mapping
+            if (windowFound && matchedTitle != null)
+            {
+                try
+                {
+                    var uri = new Uri(step.Url);
+                    DomainHintStore.Learn(uri.Host, matchedTitle);
+                }
+                catch { /* best-effort learning */ }
+            }
+
             // Give the page a moment to finish initial rendering
-            await Task.Delay(500);
+            await Task.Delay(_timing.NavigatePostRenderDelayMs).ConfigureAwait(false);
 
             return new ActionResult { Success = true, Diagnostics = $"Opened URL: '{step.Url}'" + (windowFound ? $" (page loaded in {sw.ElapsedMilliseconds}ms)" : " (page load timeout, continuing)") };
         }
@@ -381,7 +401,23 @@ public class FlowActionExecutor : IFlowActionExecutor
             var uri = new Uri(url);
             var host = uri.Host.ToLowerInvariant();
 
-            // Well-known sites → friendly name for title matching
+            // 1. Check learned domain hints (persisted from successful navigations)
+            var learned = DomainHintStore.GetHint(host);
+            if (!string.IsNullOrEmpty(learned)) return learned;
+
+            // 2. Localhost/loopback: use the first path segment as hint
+            //    e.g., "http://localhost:5000/photos" → "photos"
+            //    This helps match browser titles for locally-running apps like "Photos - MyApp"
+            if (host is "localhost" or "127.0.0.1" || host.StartsWith("192.168."))
+            {
+                var pathHint = uri.AbsolutePath.Trim('/').Split('/').FirstOrDefault();
+                if (!string.IsNullOrEmpty(pathHint) && pathHint.Length >= 2)
+                    return pathHint;
+                // No path hint — return port-based hint so at least we try
+                return uri.Port > 0 ? $"localhost:{uri.Port}" : "localhost";
+            }
+
+            // 3. Well-known sites → friendly name for title matching
             if (host.Contains("youtube")) return "YouTube";
             if (host.Contains("google")) return "Google";
             if (host.Contains("github")) return "GitHub";
@@ -393,7 +429,7 @@ public class FlowActionExecutor : IFlowActionExecutor
             if (host.Contains("linkedin")) return "LinkedIn";
             if (host.Contains("wikipedia")) return "Wikipedia";
 
-            // Generic: use the domain name (e.g. "example.com" → "example")
+            // 4. Generic: use the domain name (e.g. "example.com" → "example")
             var parts = host.Replace("www.", "").Split('.');
             return parts.Length > 0 ? parts[0] : host;
         }
@@ -419,6 +455,31 @@ public class FlowActionExecutor : IFlowActionExecutor
         {
             _log.Warn("FlowAction", $"Screenshot failed: {ex.Message}");
             return new ActionResult { Success = true, Diagnostics = $"Screenshot failed: {ex.Message}" };
+        }
+    }
+
+    private ActionResult ExecuteHover(TestStep step, AutomationElement? element)
+    {
+        if (element == null)
+            return new ActionResult { Success = false, Error = $"Cannot hover: element '{step.Selector}' not found." };
+
+        try
+        {
+            // Get element bounding rectangle and compute center point
+            var rect = element.Current.BoundingRectangle;
+            if (rect.IsEmpty)
+                return new ActionResult { Success = false, Error = $"Cannot hover: element '{step.Selector}' has no bounding rectangle." };
+
+            int centerX = (int)(rect.Left + rect.Width / 2);
+            int centerY = (int)(rect.Top + rect.Height / 2);
+
+            Win32.MoveCursor(centerX, centerY);
+            _log.Debug("FlowAction", $"Hover: moved cursor to ({centerX},{centerY}) over '{step.Selector}'");
+            return new ActionResult { Success = true, Diagnostics = $"Hovered over '{step.Selector}' at ({centerX},{centerY})" };
+        }
+        catch (Exception ex)
+        {
+            return new ActionResult { Success = false, Error = $"Hover failed: {ex.Message}" };
         }
     }
 
@@ -453,7 +514,10 @@ public class FlowActionExecutor : IFlowActionExecutor
                     return new ActionResult { Success = true, Diagnostics = $"Scrolled {step.Direction} x{step.ScrollAmount}" };
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _log.Debug("FlowAction", $"ScrollPattern failed, falling back to mouse wheel: {ex.Message}");
+            }
         }
 
         // Fallback: mouse wheel
@@ -475,12 +539,12 @@ public class FlowActionExecutor : IFlowActionExecutor
         return new ActionResult { Success = true, Diagnostics = $"Scroll {step.Direction} (no-op for horizontal without ScrollPattern)" };
     }
 
-    private ActionResult ExecuteFocusWindow(TestStep step, AutomationElement? window)
+    private async Task<ActionResult> ExecuteFocusWindowAsync(TestStep step, AutomationElement? window)
     {
         if (window == null)
             return new ActionResult { Success = false, Error = "Window not found for FocusWindow action." };
 
-        _ruleExecutor.ActivateWindow(window);
+        await _ruleExecutor.ActivateWindowAsync(window).ConfigureAwait(false);
         _log.Debug("FlowAction", $"FocusWindow: activated");
         return new ActionResult { Success = true, Diagnostics = "Window activated" };
     }
@@ -511,7 +575,7 @@ public class FlowActionExecutor : IFlowActionExecutor
 
                 // Layer 2: Poll for the window to appear in the UIA tree (max 10s)
                 var sw = Stopwatch.StartNew();
-                const int maxWaitMs = 10000;
+                int maxWaitMs = _timing.LaunchWindowTimeoutMs;
                 const int pollIntervalMs = 200;
                 AutomationElement? window = null;
                 string procName = "";
@@ -539,7 +603,7 @@ public class FlowActionExecutor : IFlowActionExecutor
                     catch (ElementNotAvailableException) { }
                     catch (InvalidOperationException) { }
 
-                    await Task.Delay(pollIntervalMs);
+                    await Task.Delay(pollIntervalMs).ConfigureAwait(false);
 
                     // Refresh process info (MainWindowHandle can change)
                     try { proc.Refresh(); } catch { }
@@ -549,7 +613,7 @@ public class FlowActionExecutor : IFlowActionExecutor
                 if (window != null)
                 {
                     var stabilityStart = Stopwatch.StartNew();
-                    while (stabilityStart.ElapsedMilliseconds < 3000)
+                    while (stabilityStart.ElapsedMilliseconds < _timing.LaunchUiaStabilityMs)
                     {
                         try
                         {
@@ -562,20 +626,20 @@ public class FlowActionExecutor : IFlowActionExecutor
                         }
                         catch (ElementNotAvailableException) { }
 
-                        await Task.Delay(150);
+                        await Task.Delay(_timing.LaunchPollIntervalMs).ConfigureAwait(false);
                     }
                 }
                 else
                 {
                     // Window never appeared — fall back to a short delay
                     _log.Debug("FlowAction", $"Launch: window not detected via UIA, waited {sw.ElapsedMilliseconds}ms");
-                    await Task.Delay(1000);
+                    await Task.Delay(1000).ConfigureAwait(false);
                 }
             }
             else
             {
                 // Process exited immediately or Start returned null (UseShellExecute)
-                await Task.Delay(1500);
+                await Task.Delay(1500).ConfigureAwait(false);
             }
 
             _log.Debug("FlowAction", $"Launch: '{step.ProcessPath}' ready");
@@ -585,5 +649,150 @@ public class FlowActionExecutor : IFlowActionExecutor
         {
             return new ActionResult { Success = false, Error = $"Failed to launch: {ex.Message}" };
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// DOMAIN HINT STORE — Learns domain→title mappings from successful navigations.
+// Persists to %LOCALAPPDATA%\IdolClick\domain-hints.json.
+// Thread-safe, lazy-loaded, write-through.
+// ═══════════════════════════════════════════════════════════════════════════════════
+
+internal static class DomainHintStore
+{
+    private static readonly string _filePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "IdolClick", "domain-hints.json");
+
+    private static readonly object _lock = new();
+    private static Dictionary<string, string>? _hints;
+
+    /// <summary>
+    /// Looks up a learned title hint for the given host (e.g., "youtube.com" → "YouTube").
+    /// Returns null if no learned mapping exists.
+    /// </summary>
+    public static string? GetHint(string host)
+    {
+        EnsureLoaded();
+        lock (_lock)
+        {
+            return _hints!.TryGetValue(NormalizeHost(host), out var hint) ? hint : null;
+        }
+    }
+
+    /// <summary>
+    /// Learns a domain→title mapping from a successful navigation.
+    /// Extracts the meaningful part of the window title (before " - " browser suffix).
+    /// </summary>
+    public static void Learn(string host, string windowTitle)
+    {
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(windowTitle)) return;
+
+        var key = NormalizeHost(host);
+        var hint = ExtractTitleHint(windowTitle);
+        if (string.IsNullOrEmpty(hint) || hint.Length < 2) return;
+
+        EnsureLoaded();
+        lock (_lock)
+        {
+            // Don't overwrite if the same hint already exists
+            if (_hints!.TryGetValue(key, out var existing) &&
+                existing.Equals(hint, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _hints[key] = hint;
+            SaveAsync(); // fire-and-forget
+        }
+    }
+
+    private static string NormalizeHost(string host)
+    {
+        host = host.ToLowerInvariant().Trim();
+        if (host.StartsWith("www.")) host = host[4..];
+        return host;
+    }
+
+    /// <summary>
+    /// Extracts a useful hint from a browser window title.
+    /// E.g., "GitHub: Let's build from here · GitHub - Google Chrome" → "GitHub"
+    /// Strips browser names from the end, takes the first segment.
+    /// </summary>
+    private static string ExtractTitleHint(string title)
+    {
+        // Remove trailing browser identifiers
+        string[] browserSuffixes = [" - Google Chrome", " - Mozilla Firefox", " - Microsoft Edge",
+                                    " — Mozilla Firefox", " - Brave", " - Opera", " - Vivaldi"];
+        foreach (var suffix in browserSuffixes)
+        {
+            if (title.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                title = title[..^suffix.Length];
+                break;
+            }
+        }
+
+        // Take the first meaningful segment (before " - ", " · ", " | ", " — ")
+        string[] separators = [" - ", " · ", " | ", " — "];
+        foreach (var sep in separators)
+        {
+            var idx = title.IndexOf(sep, StringComparison.Ordinal);
+            if (idx > 0)
+            {
+                title = title[..idx].Trim();
+                break;
+            }
+        }
+
+        return title.Trim();
+    }
+
+    private static void EnsureLoaded()
+    {
+        if (_hints != null) return;
+        lock (_lock)
+        {
+            if (_hints != null) return;
+            try
+            {
+                if (File.Exists(_filePath))
+                {
+                    var json = File.ReadAllText(_filePath);
+                    _hints = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? [];
+                }
+                else
+                {
+                    _hints = [];
+                }
+            }
+            catch
+            {
+                _hints = [];
+            }
+        }
+    }
+
+    private static void SaveAsync()
+    {
+        // Serialize inside the lock to avoid race conditions
+        string json;
+        lock (_lock)
+        {
+            json = JsonSerializer.Serialize(_hints, new JsonSerializerOptions { WriteIndented = true });
+        }
+
+        // Write to disk async outside the lock
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(_filePath)!;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                File.WriteAllText(_filePath, json);
+            }
+            catch
+            {
+                // Best-effort persistence — don't crash the app
+            }
+        });
     }
 }

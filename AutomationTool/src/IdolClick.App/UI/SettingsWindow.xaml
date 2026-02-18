@@ -17,7 +17,7 @@
 
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
         <StackPanel>
-            <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,20"/>
+            <TextBlock Text="Settings" FontSize="{StaticResource FontSizeH2}" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,20"/>
 
             <Label Content="Toggle Hotkey" Foreground="{StaticResource TextSecondaryBrush}"/>
             <TextBox x:Name="HotkeyBox" Margin="0,0,0,15" ToolTip="Keyboard shortcut to toggle automation (e.g., Ctrl+Alt+T)"/>
@@ -30,22 +30,22 @@
                 <ComboBoxItem Content="Error"/>
             </ComboBox>
 
-            <TextBlock Text="Behavior" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+            <TextBlock Text="Behavior" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
             
             <CheckBox x:Name="ShowPanelOnStartCheck" Content="Show control panel on startup" Margin="0,0,0,10"/>
             <CheckBox x:Name="StartWithWindowsCheck" Content="Start Idol Click with Windows" Margin="0,0,0,10" ToolTip="Add to Windows startup"/>
             <CheckBox x:Name="MouseNudgeCheck" Content="Prevent sleep by nudging mouse" Margin="0,0,0,10"/>
             
-            <TextBlock Text="Display" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+            <TextBlock Text="Display" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
             
             <CheckBox x:Name="ShowExecutionCountCheck" Content="Show session execution count column" Margin="0,0,0,10" ToolTip="Display 🔁 count for each rule (resets on restart)"/>
             <CheckBox x:Name="ClickRadarCheck" Content="Click Radar — show pulse animation at click point" Margin="0,0,0,10" ToolTip="Displays expanding concentric circles at each automated click so you can observe actions. Fully click-through, never steals focus."/>
 
             <Separator Margin="0,15"/>
 
-            <TextBlock Text="Safety" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,10,0,6"/>
+            <TextBlock Text="Safety" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,10,0,6"/>
             <TextBlock Text="Safety guardrails protect against accidental damage and runaway automation." 
-                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
 
             <Label Content="Kill Switch Hotkey" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
             <TextBox x:Name="KillSwitchHotkeyBox" Margin="0,0,0,10" 
@@ -55,11 +55,11 @@
             <TextBox x:Name="AllowedProcessesBox" Margin="0,0,0,4" 
                      ToolTip="Only automate these processes. Supports wildcards (e.g., notepad, MyApp*). Leave empty to allow all."/>
             <TextBlock x:Name="AllowlistWarning" Text="⚠ No process allowlist set — automation can target any window" 
-                       Foreground="#FFB74D" FontSize="11" Margin="0,0,0,10" Visibility="Collapsed"/>
+                       Foreground="{StaticResource WarningBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,10" Visibility="Collapsed"/>
 
             <Separator Margin="0,15"/>
 
-            <TextBlock Text="Agent (AI)" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+            <TextBlock Text="Agent (AI)" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
             
             <Label Content="LLM Endpoint" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
             <TextBox x:Name="AgentEndpointBox" Margin="0,0,0,10" 
@@ -91,9 +91,9 @@
                 </StackPanel>
             </Grid>
 
-            <TextBlock Text="Vision Fallback" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,6"/>
+            <TextBlock Text="Vision Fallback" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,6"/>
             <TextBlock Text="Uses LLM vision to locate elements when UIA selectors fail. Requires a vision-capable model (gpt-4o, claude-3.5-sonnet, etc.)." 
-                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
             
             <CheckBox x:Name="VisionFallbackCheck" Content="Enable vision fallback" Margin="0,0,0,10" 
                       ToolTip="When UIA selectors fail, capture a screenshot and ask the LLM to locate the element visually"/>
@@ -112,6 +112,45 @@
                     <TextBox x:Name="VisionConfidenceBox" ToolTip="Minimum confidence (0.0–1.0) to accept vision results (default: 0.7)"/>
                 </StackPanel>
             </Grid>
+
+            <TextBlock Text="🎤 Voice Input" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,6"/>
+            <TextBlock Text="Push-to-talk voice input using Azure OpenAI Whisper. Uses the same endpoint and API key configured above. A Whisper model deployment is required on your Azure resource." 
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            
+            <CheckBox x:Name="VoiceEnabledCheck" Content="Enable voice input (shows 🎤 mic button in Reason &amp; Teach modes)" Margin="0,0,0,10" 
+                      ToolTip="When enabled, a microphone button appears in the chat and teach panels for push-to-talk voice commands"/>
+            
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Label Content="Whisper Endpoint (optional)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="WhisperEndpointBox" ToolTip="Dedicated endpoint for Whisper API. Leave empty to use the main Agent endpoint above."/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <Label Content="Whisper API Key (optional)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <PasswordBox x:Name="WhisperApiKeyBox" ToolTip="Dedicated API key for the Whisper endpoint. Leave empty to use the main Agent API key."/>
+                </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Label Content="Whisper Deployment ID" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="WhisperDeploymentBox" ToolTip="Azure OpenAI deployment name for your Whisper model (default: whisper)"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <Label Content="Language (optional)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="VoiceLanguageBox" ToolTip="Language code or name (e.g., en, english, es, ja). Leave empty for auto-detect. Common names auto-convert to ISO-639-1."/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock x:Name="VoiceConfigStatus" Text="" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
             <Separator Margin="0,15"/>
 

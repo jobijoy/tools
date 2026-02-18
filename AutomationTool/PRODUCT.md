@@ -26,7 +26,7 @@ IdolClick deliberately **does not** compete with:
 |------|-------|---------------------|
 | OpenClaw | Vision-first autonomous agents | IdolClick is deterministic-first; vision is a fallback, never primary |
 | Power Automate Desktop | Generic enterprise RPA | IdolClick is developer-facing, AI-native, no-code-free |
-| Playwright | Browser-first testing | IdolClick targets native Windows UIA; Playwright support is planned for v1.1 |
+| Playwright | Browser-first testing | IdolClick is desktop-only (UIA); web testing is out of scope |
 | AutoHotkey | Scripting + hotkeys | IdolClick is structured/typed; flows are machine-generated, not hand-written |
 
 IdolClick owns one thing:
@@ -37,12 +37,31 @@ IdolClick owns one thing:
 
 ## Architecture
 
-### Dual-Mode Operation
+### Module Inventory
 
-| Mode | Description |
-|------|-------------|
-| **Classic** | Rule-based polling engine — monitors windows and auto-clicks matching UI elements |
-| **Agent** | LLM chat with 9 tool-calling functions + structured flow execution |
+| Module | Maturity | Description |
+|--------|----------|-------------|
+| **Classic** | Stable | Rule-based polling engine — monitors windows and auto-clicks matching UI elements |
+| **Agent** | Stable | LLM chat with 14 tool-calling functions: 9 classic + 5 Pack orchestration |
+| **Pack** | Stable | Orchestrated testing: Plan → Compile → Validate → Execute → Report |
+| **Commands** | Alpha | Natural language → structured flow compiler via intent classification + 15 templates |
+| **API** | Alpha | Embedded Kestrel REST + SignalR server for external tool integration |
+| **MCP** | Alpha | Model Context Protocol server (stdio) for AI agent interop |
+
+### Hand-Eye-Brain (Pack System — v1.1)
+
+The Pack system extends Agent mode with orchestrated multi-journey testing:
+
+| Component | Concept | Implementation |
+|-----------|---------|----------------|
+| **Brain** | Plans and reasons | LLM via IChatClient — plans journeys (PM role), compiles flows (SDET role) |
+| **Eye** | Perceives app state | Dual channel: structural (UIA tree) + visual (screenshot/LLM vision) |
+| **Hand** | Executes actions | IAutomationBackend — DesktopBackend (UIA) |
+
+Pipeline: **Plan → Compile → Validate → Execute → Report** (with confidence scoring)
+
+> For the full architecture deep-dive, see [ARCHITECTURE.md](ARCHITECTURE.md).  
+> For practical coding guidance, see [AGENTS-GUIDE.md](AGENTS-GUIDE.md).
 
 ### Resolution Chain
 
@@ -69,11 +88,80 @@ TestFlow JSON
 
 ```
 IAutomationBackend
-  ├── DesktopBackend (v1.0 — Windows UIA + Win32)
-  └── PlaywrightBackend (v1.1 — Web automation via Chromium/Firefox/WebKit)
+  └── DesktopBackend (v1.0 — Windows UIA + Win32)
 ```
 
 Each backend owns: selector resolution, actionability checks, action execution, assertion evaluation, and backend call logging.
+
+---
+
+## TestPack DSL v1
+
+The TestPack system extends single-flow execution into orchestrated, multi-journey test campaigns.
+
+### Pack Pipeline
+
+```
+TestPack JSON (targets, instructions, guardrails)
+  → Phase A: PackPlannerService (LLM as PM/QA)
+    → Proposed journeys, coverage map, risks
+  → Phase B+C: PackCompilerService (LLM as SDET)
+    → Executable TestFlows with selectors + assertions
+    → FlowValidatorService (retry loop, max 3 attempts)
+  → Phase D: PackRunnerService (Hand)
+    → Priority scheduling (p0→p3), backend switching, guardrails
+    → IAutomationBackend → StepResults
+  → Phase E: PackReportBuilder
+    → PackReport with failures, fix queue, coverage map, perception stats
+    → Confidence score (0.0–1.0)
+```
+
+### Dual-Perception Eye
+
+The Eye gathers evidence about application state through two channels:
+
+| Channel | Mechanism | Best For | Cost |
+|---------|-----------|----------|------|
+| **Structural** | UIA tree (desktop) | Text, element state, form values | Low — fast, deterministic |
+
+Default mode is `auto` — the engine selects the cheapest sufficient channel per step.
+
+### Confidence Scoring
+
+After execution, the orchestrator produces a confidence score (0.0–1.0):
+
+| Component | Weight | Measures |
+|-----------|--------|----------|
+| Journey pass rate | 60% | `passed / total` journeys |
+| Coverage completion | 20% | `ok / total` coverage areas |
+| Perception reliability | 10% | `1 - vision_fallback_rate` |
+| Warning impact | 10% | `1 - (warning_rate × 2)` |
+
+Interpretation: 0.9+ = High confidence | 0.7–0.9 = Moderate | 0.5–0.7 = Low | <0.5 = Critical
+
+### Example TestPack
+
+```json
+{
+  "schemaVersion": "1.0",
+  "packName": "Notepad Smoke Test",
+  "targets": [{ "targetId": "notepad", "kind": "desktop", "processName": "notepad" }],
+  "inputs": {
+    "instructions": "Test basic Notepad operations: open, type, save, close",
+    "projectContext": {
+      "featureList": ["text editing", "file save", "file open"],
+      "knownRisks": ["save dialog may prompt for encoding"]
+    }
+  },
+  "guardrails": {
+    "safetyMode": "strict",
+    "maxJourneys": 5,
+    "maxTotalSteps": 50,
+    "requireTargetLockForDesktop": true,
+    "allowlistedProcesses": ["notepad"]
+  }
+}
+```
 
 ---
 
@@ -131,7 +219,7 @@ The exchange format between AI agents and IdolClick.
 | `assert_not_exists` | Verify element is NOT present |
 | `assert_text` | Verify element text content |
 | `assert_window` | Verify window title |
-| `navigate` | Open URL (web backend) |
+| `navigate` | Open URL via shell execute (default browser) |
 | `screenshot` | Capture screen state |
 | `scroll` | Scroll in a direction |
 | `focus_window` | Bring window to foreground |
@@ -159,7 +247,7 @@ Examples:
 }
 ```
 
-Supported kinds: `desktop_uia`, `playwright_css`, `playwright_role`, `playwright_text`, `playwright_label`, `playwright_testid`
+Supported kinds: `desktop_uia`
 
 ---
 
@@ -271,7 +359,7 @@ Safety-critical events are written to a persistent `audit_log.txt`:
 - Process allowlist blocks
 - Vision fallback usage
 
-### Actionability Checks (Playwright-Inspired)
+### Actionability Checks (Pre-Action Validation)
 
 Before every action, the backend verifies:
 - **Exists** — element is in the UI tree
@@ -285,7 +373,9 @@ Before every action, the backend verifies:
 
 ## Agent Tools
 
-When in Agent mode, the LLM has access to 9 structured tools:
+When in Agent mode, the LLM has access to 14 structured tools:
+
+### Classic Tools (9)
 
 | Tool | Purpose |
 |------|---------|
@@ -299,7 +389,17 @@ When in Agent mode, the LLM has access to 9 structured tools:
 | `GetCapabilities` | Query what actions/assertions the backend supports |
 | `LocateByVision` | Use LLM vision to find an element by description |
 
-The agent interaction is **spec-driven, not chat-driven**. The LLM uses `ValidateFlow` → `RunFlow` → reads report → patches flow → retries. This is the closed-loop regression testing model.
+### Pack Orchestration Tools (5)
+
+| Tool | Purpose |
+|------|---------|
+| `RunFullPipeline` | One-shot: Plan → Compile → Execute → Report with confidence score |
+| `PlanTestPack` | Generate a test plan (journeys, coverage, risks) without executing |
+| `GetFixQueue` | Get ranked fix items from the latest pack execution |
+| `GetConfidenceBreakdown` | Get confidence score breakdown (journey rate, coverage, perception, warnings) |
+| `AnalyzeReport` | Get comprehensive analysis of latest pack execution |
+
+The agent interaction is **spec-driven, not chat-driven**. The LLM uses `ValidateFlow` → `RunFlow` → reads report → patches flow → retries. For orchestrated campaigns, it uses `RunFullPipeline` → `GetFixQueue` → addresses issues.
 
 ---
 
@@ -323,7 +423,7 @@ The agent interaction is **spec-driven, not chat-driven**. The LLM uses `Validat
 
 ## Roadmap
 
-### v1.0.0 (Current)
+### v1.0.0 (Shipped)
 - Desktop UIA backend with actionability checks
 - Structured TestFlow DSL v1 + FlowValidator
 - 9 agent tools with function-calling LLM
@@ -332,18 +432,38 @@ The agent interaction is **spec-driven, not chat-driven**. The LLM uses `Validat
 - Execution reports with full trace metadata
 - Plugin system (PowerShell + .NET)
 
-### v1.1.0 (Next)
-- Playwright backend (web automation via Chromium/Firefox/WebKit)
+### v1.1.0-alpha (Sprint 1 — Complete)
+- **TestPack model** — multi-journey test programs with targets, guardrails, data profiles
+- **Pack Pipeline** — Plan → Compile → Validate → Execute → Report
+- **Dual-perception Eye** — structural (UIA tree) + visual (screenshot) perception
+- **Confidence scoring** — 0.0–1.0 weighted score for quality signal
+- **5 Pack agent tools** — RunFullPipeline, PlanTestPack, GetFixQueue, GetConfidenceBreakdown, AnalyzeReport
+- **Fix queue** — ranked, actionable fix items with FixPackets for coding agents
+- **3 new JSON schemas** — test-pack, pack-plan, pack-report (JSON Schema 2020-12)
+- **FlowValidator extensions** — backend-specific rules, TypedSelector validation
+- **Commands module (alpha)** — NL intent → flow templates, 15 built-in templates, 3-tier escalation
+- **API server (alpha)** — Kestrel REST + SignalR for external integration
+- **MCP server (alpha)** — Model Context Protocol tool server for AI agent ecosystems
+
+### v1.2.0 (Sprint 2 — Planned)
+- MCP client protocol (JSON-RPC 2.0)
+- Figma MCP integration for visual regression detection
+- Backend API MCP for data consistency validation
+
+### v1.3.0 (Sprint 3 — Planned)
+- Live execution dashboard (WPF)
+- Confidence Engine v2 with historical trends
+- AI-powered suggestion engine
+
+### v1.4.0 (Sprint 4 — Planned)
+- Advanced UIA selectors and multi-monitor support
 - CLI runner (`idolclick run flow.json`)
-- `--version`, `--help`, `--validate` arguments
-- ServiceHost extraction (no WPF dependencies)
 
 ### Future
-- DPAPI encryption for API keys
-- FlowValidator NuGet package extraction
-- Live execution streaming
-- SQLite timeline persistence
-- Flow recording (watch user actions → generate flow JSON)
+- Multi-agent orchestration
+- Accessibility/WCAG compliance testing
+- Commands module stabilization and fuzzy intent matching
+- Flow recording (watch user → generate flow JSON)
 
 ---
 
@@ -352,12 +472,14 @@ The agent interaction is **spec-driven, not chat-driven**. The LLM uses `Validat
 | Component | Technology |
 |-----------|------------|
 | Framework | .NET 8, WPF (Windows Presentation Foundation) |
-| UI Automation | UIAutomationClient, UIAutomationTypes |
-| LLM Integration | Microsoft.Extensions.AI + OpenAI-compatible API |
-| Tool Calling | FunctionInvokingChatClient (auto-marshaling) |
+| UI Automation | UIAutomationClient, UIAutomationTypes (GAC) |
+| LLM Integration | Microsoft.Extensions.AI 10.3.0 + Azure.AI.OpenAI 2.8.0-beta.1 |
+| Tool Calling | Manual tool-calling loop with real-time progress callbacks |
 | Vision | GDI+ screen capture → LLM vision API |
 | Scripting | PowerShell, Roslyn (C#) |
-| Packaging | Self-contained exe, Inno Setup installer |
+| Serialization | System.Text.Json (camelCase props, snake_case enums) |
+| Schemas | JSON Schema 2020-12 |
+| Packaging | Self-contained exe (`PublishSingleFile` + `PublishTrimmed`), Inno Setup installer |
 
 ---
 
@@ -372,3 +494,14 @@ The agent interaction is **spec-driven, not chat-driven**. The LLM uses `Validat
 ---
 
 *IdolClick v1.0.0 — Built for developers who need reliable, repeatable Windows UI automation that AI agents can orchestrate.*
+
+---
+
+## Related Documentation
+
+| Document | Audience | Content |
+|----------|----------|---------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Agents & architects | Full architecture reference: layers, data flow, component inventory, dependency graph |
+| [AGENTS-GUIDE.md](AGENTS-GUIDE.md) | Coding agents | Practical how-to: conventions, common tasks, gotchas, build instructions |
+| [CHANGELOG.md](CHANGELOG.md) | Everyone | Version history and release notes |
+| [MANUAL-TEST-CASES.md](MANUAL-TEST-CASES.md) | QA | Manual test scenarios for both modes |

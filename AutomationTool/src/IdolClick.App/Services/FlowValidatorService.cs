@@ -84,6 +84,9 @@ public class FlowValidatorService
         foreach (var dup in orders)
             result.Warnings.Add($"Duplicate order {dup.Key} found on {dup.Count()} steps.");
 
+        // ── Backend-specific validation ───────────────────────────────────────
+        ValidateBackendRules(flow, result);
+
         // ── Log result ────────────────────────────────────────────────────────
         if (result.IsValid)
             _log.Debug("Validator", $"Flow '{flow.TestName}' validated: {flow.Steps.Count} steps, {result.Warnings.Count} warnings");
@@ -103,6 +106,7 @@ public class FlowValidatorService
         switch (step.Action)
         {
             case StepAction.Click:
+            case StepAction.Hover:
             case StepAction.AssertExists:
             case StepAction.AssertNotExists:
                 if (string.IsNullOrWhiteSpace(step.Selector))
@@ -183,6 +187,85 @@ public class FlowValidatorService
 
         if (string.IsNullOrWhiteSpace(step.Description))
             result.Warnings.Add($"{prefix}: Missing step description (recommended for readability).");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // BACKEND-SPECIFIC VALIDATION — Desktop UIA rules
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Validates rules specific to the desktop-uia backend.
+    /// </summary>
+    private static void ValidateBackendRules(TestFlow flow, FlowValidationResult result)
+    {
+        var backend = flow.Backend?.ToLowerInvariant() ?? "desktop";
+
+        ValidateDesktopFlow(flow, result);
+
+        // TypedSelector validation (any backend)
+        for (int i = 0; i < flow.Steps.Count; i++)
+        {
+            var step = flow.Steps[i];
+            if (step.TypedSelector != null)
+            {
+                ValidateTypedSelector(step.TypedSelector, backend, $"Step {i + 1}", result);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Validates desktop-specific flow rules.
+    /// </summary>
+    private static void ValidateDesktopFlow(TestFlow flow, FlowValidationResult result)
+    {
+        for (int i = 0; i < flow.Steps.Count; i++)
+        {
+            var step = flow.Steps[i];
+            var prefix = $"Step {i + 1}";
+
+            // Navigate with URL in desktop flow is unusual (not an error — Launch + URL is valid)
+            if (step.Action == StepAction.Navigate && !string.IsNullOrWhiteSpace(step.Url))
+            {
+                result.Warnings.Add(
+                    $"{prefix}: 'Navigate' with URL in desktop flow. " +
+                    "This will open a URL in the default browser via shell execute.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Validates a TypedSelector against the flow's backend.
+    /// </summary>
+    private static void ValidateTypedSelector(
+        StepSelector typed, string backend, string prefix, FlowValidationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(typed.Value))
+        {
+            result.Errors.Add($"{prefix}: TypedSelector has empty value.");
+            return;
+        }
+
+        // ── Desktop backend: only desktop_uia allowed ────────────────────────
+        var desktopKinds = new HashSet<SelectorKind> { SelectorKind.DesktopUia };
+
+        if (!desktopKinds.Contains(typed.Kind))
+        {
+            result.Errors.Add(
+                $"{prefix}: TypedSelector kind '{typed.Kind}' is not supported. " +
+                "Only DesktopUia selectors are supported.");
+        }
+
+        // ── Kind-specific format checks ──────────────────────────────────────
+        switch (typed.Kind)
+        {
+            case SelectorKind.DesktopUia:
+                // Desktop UIA selectors should follow ElementType#Identifier format
+                if (!typed.Value.Contains('#'))
+                    result.Warnings.Add(
+                        $"{prefix}: Desktop UIA selector '{typed.Value}' " +
+                        "should use 'ElementType#Identifier' format.");
+                break;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

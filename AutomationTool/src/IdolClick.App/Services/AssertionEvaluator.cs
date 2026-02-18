@@ -20,13 +20,9 @@ namespace IdolClick.Services;
 public interface IAssertionEvaluator
 {
     /// <summary>
-    /// Evaluates a single assertion with retry/timeout.
+    /// Evaluates a single assertion with retry/timeout (async — uses non-blocking waits).
     /// </summary>
-    /// <param name="assertion">The assertion to evaluate.</param>
-    /// <param name="window">The window context for element lookups.</param>
-    /// <param name="selectorParser">Selector parser for element resolution.</param>
-    /// <returns>Structured assertion result.</returns>
-    AssertionResult Evaluate(Assertion assertion, AutomationElement? window, SelectorParser selectorParser);
+    Task<AssertionResult> EvaluateAsync(Assertion assertion, AutomationElement? window, SelectorParser selectorParser, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -41,16 +37,16 @@ public class AssertionEvaluator : IAssertionEvaluator
         _log = log ?? throw new ArgumentNullException(nameof(log));
     }
 
-    public AssertionResult Evaluate(Assertion assertion, AutomationElement? window, SelectorParser selectorParser)
+    public async Task<AssertionResult> EvaluateAsync(Assertion assertion, AutomationElement? window, SelectorParser selectorParser, CancellationToken ct = default)
     {
         try
         {
             return assertion.Type switch
             {
-                AssertionType.Exists => EvaluateExists(assertion, window, selectorParser),
-                AssertionType.NotExists => EvaluateNotExists(assertion, window, selectorParser),
-                AssertionType.TextContains => EvaluateTextContains(assertion, window, selectorParser),
-                AssertionType.TextEquals => EvaluateTextEquals(assertion, window, selectorParser),
+                AssertionType.Exists => await EvaluateExistsAsync(assertion, window, selectorParser, ct).ConfigureAwait(false),
+                AssertionType.NotExists => await EvaluateNotExistsAsync(assertion, window, selectorParser).ConfigureAwait(false),
+                AssertionType.TextContains => await EvaluateTextContainsAsync(assertion, window, selectorParser, ct).ConfigureAwait(false),
+                AssertionType.TextEquals => await EvaluateTextEqualsAsync(assertion, window, selectorParser, ct).ConfigureAwait(false),
                 AssertionType.WindowTitle => EvaluateWindowTitle(assertion, window),
                 AssertionType.ProcessRunning => EvaluateProcessRunning(assertion),
                 _ => new AssertionResult
@@ -75,40 +71,39 @@ public class AssertionEvaluator : IAssertionEvaluator
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // ASSERTION IMPLEMENTATIONS
+    // ASSERTION IMPLEMENTATIONS — ASYNC (non-blocking waits)
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    private AssertionResult EvaluateExists(Assertion assertion, AutomationElement? window, SelectorParser parser)
+    private async Task<AssertionResult> EvaluateExistsAsync(Assertion assertion, AutomationElement? window, SelectorParser parser, CancellationToken ct)
     {
         if (window == null || string.IsNullOrWhiteSpace(assertion.Selector))
             return Fail(assertion, "exists", "no window/selector");
 
-        var match = RetryResolve(parser, window, assertion.Selector, assertion.TimeoutMs);
+        var match = await parser.ResolveAsync(window, assertion.Selector, assertion.TimeoutMs, ct: ct).ConfigureAwait(false);
 
         return match != null
             ? Pass(assertion, "exists", "found")
             : Fail(assertion, "exists", "not found");
     }
 
-    private AssertionResult EvaluateNotExists(Assertion assertion, AutomationElement? window, SelectorParser parser)
+    private Task<AssertionResult> EvaluateNotExistsAsync(Assertion assertion, AutomationElement? window, SelectorParser parser)
     {
         if (window == null || string.IsNullOrWhiteSpace(assertion.Selector))
-            return Pass(assertion, "not exists", "no window/selector");
+            return Task.FromResult(Pass(assertion, "not exists", "no window/selector"));
 
-        // For "not exists", we do a single check (no retry — we expect it to be gone)
         var match = parser.ResolveOnce(window, assertion.Selector);
 
-        return match == null
+        return Task.FromResult(match == null
             ? Pass(assertion, "not exists", "confirmed absent")
-            : Fail(assertion, "not exists", "still present");
+            : Fail(assertion, "not exists", "still present"));
     }
 
-    private AssertionResult EvaluateTextContains(Assertion assertion, AutomationElement? window, SelectorParser parser)
+    private async Task<AssertionResult> EvaluateTextContainsAsync(Assertion assertion, AutomationElement? window, SelectorParser parser, CancellationToken ct)
     {
         if (window == null || string.IsNullOrWhiteSpace(assertion.Selector))
             return Fail(assertion, assertion.Expected ?? "", "no window/selector");
 
-        var match = RetryResolve(parser, window, assertion.Selector, assertion.TimeoutMs);
+        var match = await parser.ResolveAsync(window, assertion.Selector, assertion.TimeoutMs, ct: ct).ConfigureAwait(false);
         if (match == null)
             return Fail(assertion, assertion.Expected ?? "", $"element '{assertion.Selector}' not found");
 
@@ -121,12 +116,12 @@ public class AssertionEvaluator : IAssertionEvaluator
             : Fail(assertion, expected, actual, $"Text '{actual}' does not contain '{expected}'");
     }
 
-    private AssertionResult EvaluateTextEquals(Assertion assertion, AutomationElement? window, SelectorParser parser)
+    private async Task<AssertionResult> EvaluateTextEqualsAsync(Assertion assertion, AutomationElement? window, SelectorParser parser, CancellationToken ct)
     {
         if (window == null || string.IsNullOrWhiteSpace(assertion.Selector))
             return Fail(assertion, assertion.Expected ?? "", "no window/selector");
 
-        var match = RetryResolve(parser, window, assertion.Selector, assertion.TimeoutMs);
+        var match = await parser.ResolveAsync(window, assertion.Selector, assertion.TimeoutMs, ct: ct).ConfigureAwait(false);
         if (match == null)
             return Fail(assertion, assertion.Expected ?? "", $"element '{assertion.Selector}' not found");
 
@@ -182,11 +177,6 @@ public class AssertionEvaluator : IAssertionEvaluator
     // ═══════════════════════════════════════════════════════════════════════════════
     // HELPERS
     // ═══════════════════════════════════════════════════════════════════════════════
-
-    private static SelectorMatch? RetryResolve(SelectorParser parser, AutomationElement window, string selector, int timeoutMs)
-    {
-        return parser.Resolve(window, selector, timeoutMs, out _);
-    }
 
     private static AssertionResult Pass(Assertion assertion, string expected, string actual)
     {

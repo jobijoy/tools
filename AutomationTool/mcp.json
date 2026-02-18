@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "idolclick": {
+      "type": "stdio",
+      "command": "IdolClick.exe",
+      "args": ["--mcp"],
+      "env": {}
+    }
+  }
+}

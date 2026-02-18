@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "testName": "Calculator Smoke Test",
+  "description": "Opens Calculator, performs 2+3, and verifies the result is 5. Shows multi-step click sequences with assertions.",
+  "targetApp": "CalculatorApp",
+  "stopOnFailure": true,
+  "timeoutSeconds": 30,
+  "steps": [
+    {
+      "order": 1,
+      "action": "launch",
+      "processPath": "calc.exe",
+      "description": "Open Calculator",
+      "timeoutMs": 5000,
+      "delayAfterMs": 1500
+    },
+    {
+      "order": 2,
+      "action": "click",
+      "selector": "Button#Two",
+      "description": "Press 2",
+      "timeoutMs": 3000,
+      "delayAfterMs": 300
+    },
+    {
+      "order": 3,
+      "action": "click",
+      "selector": "Button#Plus",
+      "description": "Press +",
+      "delayAfterMs": 300
+    },
+    {
+      "order": 4,
+      "action": "click",
+      "selector": "Button#Three",
+      "description": "Press 3",
+      "delayAfterMs": 300
+    },
+    {
+      "order": 5,
+      "action": "click",
+      "selector": "Button#Equals",
+      "description": "Press =",
+      "delayAfterMs": 500
+    },
+    {
+      "order": 6,
+      "action": "assert_text",
+      "selector": "Text#CalculatorResults",
+      "contains": "5",
+      "description": "Verify the display shows 5",
+      "timeoutMs": 3000
+    }
+  ]
+}

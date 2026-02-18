@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/jobijoy/IdolClick/main/schemas/pack-plan.schema.json",
+  "title": "IdolClick PackPlan v1",
+  "description": "Planner output — proposed journeys, coverage map, risk analysis, and perception recommendations. Intermediate artifact between natural language instructions and a compiled TestPack.",
+  "type": "object",
+  "required": ["schemaVersion", "packName", "journeys"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "packName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "journeys": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/PlannedJourney" }
+    },
+    "coverageMap": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CoverageMapEntry" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/RiskEntry" }
+    },
+    "suggestedDataProfiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/SuggestedDataProfile" }
+    },
+    "perceptionRecommendations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/PerceptionRecommendation" },
+      "description": "Which Eye mode (structural vs. visual) is recommended per journey."
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "PerceptionMode": {
+      "type": "string",
+      "enum": ["structural", "visual", "structural_first", "dual", "auto"],
+      "description": "How the Eye captures information. Structural = DOM/UIA. Visual = screenshot. Auto = engine selects."
+    },
+    "SuccessCriterionType": {
+      "type": "string",
+      "enum": ["structural_text", "structural_element", "desktop_text", "desktop_element", "visual_match", "custom"]
+    },
+    "PlannedJourney": {
+      "type": "object",
+      "required": ["journeyId", "title"],
+      "properties": {
+        "journeyId": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "priority": {
+          "type": "string",
+          "enum": ["p0", "p1", "p2", "p3"],
+          "default": "p1"
+        },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "coverageAreas": { "type": "array", "items": { "type": "string" } },
+        "successCriteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": { "$ref": "#/$defs/SuccessCriterionType" },
+              "selectorKind": { "type": "string" },
+              "selectorValue": { "type": "string" },
+              "contains": { "type": "string" },
+              "equals": { "type": "string" },
+              "description": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "requiredDataProfiles": { "type": "array", "items": { "type": "string" } },
+        "requiredBackends": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["desktop-uia"] }
+        },
+        "recommendedPerception": { "$ref": "#/$defs/PerceptionMode" }
+      },
+      "additionalProperties": false
+    },
+    "CoverageMapEntry": {
+      "type": "object",
+      "required": ["area"],
+      "properties": {
+        "area": { "type": "string", "minLength": 1 },
+        "journeys": { "type": "array", "items": { "type": "string" } },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "gap", "partial"],
+          "default": "ok"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RiskEntry": {
+      "type": "object",
+      "required": ["tag"],
+      "properties": {
+        "tag": { "type": "string" },
+        "description": { "type": "string" },
+        "mitigation": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SuggestedDataProfile": {
+      "type": "object",
+      "required": ["profileId"],
+      "properties": {
+        "profileId": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "suggestedValues": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PerceptionRecommendation": {
+      "type": "object",
+      "required": ["journeyId", "recommendedMode"],
+      "properties": {
+        "journeyId": { "type": "string" },
+        "recommendedMode": { "$ref": "#/$defs/PerceptionMode" },
+        "rationale": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

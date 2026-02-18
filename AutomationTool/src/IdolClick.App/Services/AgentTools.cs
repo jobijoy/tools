@@ -32,6 +32,7 @@ public class AgentTools
     private readonly StepExecutor? _executor;
     private readonly ReportService? _reportService;
     private readonly VisionService? _visionService;
+    private string? _cachedCapabilities; // R3.4: Cached serialized capabilities
 
     public AgentTools(ConfigService config, LogService log, FlowValidatorService validator,
         StepExecutor? executor = null, ReportService? reportService = null,
@@ -76,6 +77,15 @@ public class AgentTools
                     }
                     catch { }
 
+                    // Filter out invisible/zero-area windows to reduce noise
+                    try
+                    {
+                        var rect = w.Current.BoundingRectangle;
+                        if (rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0)
+                            continue;
+                    }
+                    catch { }
+
                     windows.Add(new
                     {
                         processName,
@@ -105,13 +115,13 @@ public class AgentTools
     public string InspectWindow(
         [Description("Process name or partial window title to inspect (e.g., 'notepad', 'chrome', 'Settings')")] string processName,
         [Description("Maximum depth to traverse the element tree. Default: 3")] int maxDepth = 3,
-        [Description("Maximum number of elements to return. Default: 50")] int maxElements = 50)
+        [Description("Maximum number of elements to return. Default: 30")] int maxElements = 30)
     {
         try
         {
-            // Clamp parameters
-            maxDepth = Math.Clamp(maxDepth, 1, 6);
-            maxElements = Math.Clamp(maxElements, 5, 200);
+            // Clamp parameters — keep element count bounded to limit token usage
+            maxDepth = Math.Clamp(maxDepth, 1, 5);
+            maxElements = Math.Clamp(maxElements, 5, 60);
 
             // Find the window — try by process name first
             AutomationElement? window = null;
@@ -255,29 +265,29 @@ public class AgentTools
     {
         try
         {
-            var processes = Process.GetProcesses()
-                .Where(p =>
+            // R4.2: Ensure ALL Process handles are disposed (not just those passing the filter)
+            var allProcs = Process.GetProcesses();
+            var results = new List<(int pid, string name, string windowTitle)>();
+            
+            foreach (var p in allProcs)
+            {
+                using (p)
                 {
-                    try { return p.MainWindowHandle != IntPtr.Zero; }
-                    catch { return false; }
-                })
-                .Select(p =>
-                {
-                    using (p)
+                    try
                     {
-                        return new
-                        {
-                            pid = p.Id,
-                            name = p.ProcessName,
-                            windowTitle = p.MainWindowTitle
-                        };
+                        if (p.MainWindowHandle == IntPtr.Zero) continue;
+                        results.Add((p.Id, p.ProcessName, p.MainWindowTitle));
                     }
-                })
-                .OrderBy(p => p.name)
-                .ToList();
+                    catch { }
+                }
+            }
 
-            _log.Debug("Tools", $"ListProcesses: found {processes.Count} windowed processes");
-            return JsonSerializer.Serialize(processes, FlowJson.Options);
+            results.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.OrdinalIgnoreCase));
+
+            _log.Debug("Tools", $"ListProcesses: found {results.Count} windowed processes");
+            return JsonSerializer.Serialize(
+                results.Select(r => new { pid = r.pid, name = r.name, windowTitle = r.windowTitle }),
+                FlowJson.Options);
         }
         catch (Exception ex)
         {
@@ -324,6 +334,9 @@ public class AgentTools
     [Description("Returns IdolClick's capabilities: all supported step actions with their required fields, assertion types, selector formats, and active automation backend. Use this when you need to know what automation primitives are available.")]
     public string GetCapabilities()
     {
+        // R3.4: Return cached result if available (capabilities are stable per session)
+        if (_cachedCapabilities != null)
+            return _cachedCapabilities;
         // Query active backend capabilities if available
         var backend = _executor?.Backend;
         var backendInfo = backend != null
@@ -332,7 +345,6 @@ public class AgentTools
                 name = backend.Name,
                 version = backend.Version,
                 supportsTracing = backend.Capabilities.SupportsTracing,
-                supportsNetworkLogs = backend.Capabilities.SupportsNetworkLogs,
                 supportsScreenshots = backend.Capabilities.SupportsScreenshots,
                 supportsActionabilityChecks = backend.Capabilities.SupportsActionabilityChecks,
                 supportedSelectorKinds = backend.Capabilities.SupportedSelectorKinds.Select(k => k.ToString()).ToArray()
@@ -351,12 +363,12 @@ public class AgentTools
             } : null,
             backends = new object[]
             {
-                new { name = "desktop-uia", description = "Windows UI Automation + Win32", selectorKinds = new[] { "DesktopUia" } },
-                new { name = "playwright", description = "Browser automation via Playwright .NET (future)", selectorKinds = new[] { "PlaywrightCss", "PlaywrightRole", "PlaywrightText", "PlaywrightLabel", "PlaywrightTestId" } }
+                new { name = "desktop-uia", description = "Windows UI Automation + Win32", selectorKinds = new[] { "DesktopUia" } }
             },
             actions = new object[]
             {
                 new { name = "click", description = "Click a UI element by selector", required = new[] { "selector" }, actionabilityChecks = new[] { "exists", "visible", "stable", "enabled", "receives_events" } },
+                new { name = "hover", description = "Move cursor over a UI element (triggers tooltips, dropdowns, hover states)", required = new[] { "selector" }, actionabilityChecks = new[] { "exists", "visible", "stable" } },
                 new { name = "type", description = "Type text into an element or focused control", required = new[] { "text" }, optional = new[] { "selector" }, actionabilityChecks = new[] { "exists", "visible", "enabled", "editable" } },
                 new { name = "send_keys", description = "Send keyboard shortcuts (e.g., Ctrl+S, Tab, Enter)", required = new[] { "keys" } },
                 new { name = "wait", description = "Wait for an element to appear or fixed delay", required = Array.Empty<string>(), optional = new[] { "selector", "timeoutMs" } },
@@ -364,7 +376,7 @@ public class AgentTools
                 new { name = "assert_not_exists", description = "Verify a UI element does NOT exist", required = new[] { "selector" } },
                 new { name = "assert_text", description = "Verify element text contains or equals a value", required = new[] { "selector", "contains" }, optional = new[] { "exact" } },
                 new { name = "assert_window", description = "Verify a window title matches", required = new[] { "windowTitle or contains" } },
-                new { name = "navigate", description = "Open a URL (browser mode — future)", required = new[] { "url" } },
+                new { name = "navigate", description = "Open a URL via shell execute (opens default browser)", required = new[] { "url" } },
                 new { name = "screenshot", description = "Capture a screenshot for the report", required = Array.Empty<string>() },
                 new { name = "scroll", description = "Scroll within an element or window", required = new[] { "direction" }, optional = new[] { "scrollAmount", "selector" } },
                 new { name = "focus_window", description = "Bring a window to the foreground", required = new[] { "app or windowTitle" } },
@@ -397,23 +409,11 @@ public class AgentTools
                         "Use InspectWindow to discover exact selectors before generating flows",
                         "Element types map to UI Automation ControlTypes (Button, TextBox, etc.)"
                     }
-                },
-                playwright = new
-                {
-                    note = "When playwright backend is active, use typed selectors:",
-                    kinds = new object[]
-                    {
-                        new { kind = "PlaywrightRole", example = "button", extra = "Submit", description = "page.GetByRole(AriaRole.Button, { Name = 'Submit' })" },
-                        new { kind = "PlaywrightLabel", example = "Username", description = "page.GetByLabel('Username')" },
-                        new { kind = "PlaywrightTestId", example = "checkout-button", description = "page.GetByTestId('checkout-button') [recommended]" },
-                        new { kind = "PlaywrightCss", example = "#id .class", description = "page.Locator('#id .class')" },
-                        new { kind = "PlaywrightText", example = "Submit order", description = "page.GetByText('Submit order')" }
-                    }
                 }
             }
         };
 
-        return JsonSerializer.Serialize(capabilities, FlowJson.Options);
+        return _cachedCapabilities = JsonSerializer.Serialize(capabilities, FlowJson.Options);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -459,11 +459,34 @@ public class AgentTools
 
             _log.Info("Tools", $"RunFlow: '{flow.TestName}' {report.Result} — {report.PassedCount}/{report.Steps.Count} passed");
 
-            // Return the full report as JSON for AI consumption
+            // Return a compact summary for AI consumption (full report saved to disk).
+            // Only include failed/warning step details to reduce token usage.
+            var failedSteps = report.Steps
+                .Where(s => s.Status is StepStatus.Failed or StepStatus.Error or StepStatus.Warning)
+                .Select(s => new
+                {
+                    step = s.Step,
+                    action = s.Action,
+                    selector = s.Selector,
+                    status = s.Status,
+                    error = s.Error,
+                    warningCode = s.WarningCode
+                }).ToList();
+
             var result = new
             {
-                report,
-                savedTo = reportPath
+                testName = report.TestName,
+                result = report.Result,
+                passed = report.PassedCount,
+                failed = report.FailedCount,
+                skipped = report.SkippedCount,
+                warnings = report.WarningCount,
+                totalSteps = report.Steps.Count,
+                totalTimeMs = report.TotalTimeMs,
+                failedStep = report.FailedStep,
+                failedStepDetails = failedSteps,
+                savedTo = reportPath,
+                summary = report.Summary
             };
             return JsonSerializer.Serialize(result, FlowJson.Options);
         }
@@ -495,7 +518,7 @@ public class AgentTools
         }), FlowJson.Options);
     }
 
-    [Description("Captures a screenshot of the current desktop and returns the file path. Use this for visual debugging or when you need to see the current UI state.")]
+    [Description("Captures a screenshot of the current desktop and returns the file path. Essential for web data extraction: capture the screen state after navigation, then pass the path to LocateByVision to read visible content. Also useful for visual debugging.")]
     public string CaptureScreenshot()
     {
         if (_reportService == null)
@@ -512,9 +535,9 @@ public class AgentTools
     // VISION FALLBACK
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    [Description("Uses LLM vision to locate a UI element by visual description when UIA selectors fail. Captures a screenshot, sends it to a vision-capable LLM, and returns bounding box coordinates + confidence. This is STRICTLY a fallback — always try UIA selectors first (InspectWindow). Requires vision fallback to be enabled in settings.")]
+    [Description("Uses LLM vision to locate a UI element OR read text/data from the screen. Two use cases: (1) Locate an element by visual description when UIA selectors fail — returns bounding box coordinates. (2) Read visible content from a screenshot — describe what data you need (e.g., 'list all product names and prices visible on this page'). Captures a screenshot, sends it to a vision-capable LLM, and returns the result. For web pages, this is the PRIMARY way to read page content since UIA cannot see inside browser-rendered content. Requires vision fallback to be enabled in settings.")]
     public async Task<string> LocateByVision(
-        [Description("Natural language description of the element to find (e.g., 'the blue Save button in the toolbar', 'the search text box near the top')")] string description,
+        [Description("Natural language description of what to find or read (e.g., 'the blue Save button in the toolbar', 'list all product names and prices on this page', 'read the table of search results')")] string description,
         [Description("Optional: process name or window title to scope the search to a specific window. If empty, captures full screen.")] string windowHint = "")
     {
         if (_visionService == null || !_visionService.IsEnabled)

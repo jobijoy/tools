@@ -20,6 +20,7 @@ public class ConfigService
     public const int CurrentSchemaVersion = 1;
     
     private readonly string _configPath;
+    private readonly string _secretsPath;
     private AppConfig? _config;
     private DateTime _lastModified;
     private readonly object _lock = new();
@@ -43,7 +44,30 @@ public class ConfigService
     public ConfigService(string configPath)
     {
         _configPath = configPath ?? throw new ArgumentNullException(nameof(configPath));
+
+        // Store credentials in .kv/store.dat — the folder is gitignored.
+        var configDir = Path.GetDirectoryName(configPath) ?? ".";
+        var kvDir = Path.Combine(configDir, ".kv");
+        Directory.CreateDirectory(kvDir);
+        _secretsPath = Path.Combine(kvDir, "store.dat");
+
+        // Migrate from legacy locations
+        MigrateLegacy(Path.Combine(configDir, ".secrets", "secrets.json"));
+        MigrateLegacy(Path.Combine(configDir, "secrets.json"));
     }
+
+    private void MigrateLegacy(string legacyPath)
+    {
+        if (File.Exists(legacyPath) && !File.Exists(_secretsPath))
+        {
+            try { File.Move(legacyPath, _secretsPath); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Gets the path to the secrets file (next to config.json).
+    /// </summary>
+    public string SecretsPath => _secretsPath;
 
     /// <summary>
     /// Gets the current configuration, reloading from disk if the file has changed.
@@ -66,7 +90,8 @@ public class ConfigService
     }
 
     /// <summary>
-    /// Saves the configuration to disk.
+    /// Saves the configuration to disk. Secrets (API keys, endpoints) are written
+    /// to a separate secrets.json file and stripped from config.json.
     /// </summary>
     /// <param name="config">The configuration to save.</param>
     public void SaveConfig(AppConfig config)
@@ -75,8 +100,30 @@ public class ConfigService
         
         lock (_lock)
         {
+            // Extract secrets and save separately
+            SaveSecrets(config.AgentSettings);
+
+            // Write config.json WITHOUT secrets (empty placeholders)
+            var agent = config.AgentSettings;
+            var savedEndpoint = agent.Endpoint;
+            var savedApiKey = agent.ApiKey;
+            var savedWhisperEndpoint = agent.WhisperEndpoint;
+            var savedWhisperApiKey = agent.WhisperApiKey;
+
+            agent.Endpoint = "";
+            agent.ApiKey = "";
+            agent.WhisperEndpoint = "";
+            agent.WhisperApiKey = "";
+
             var json = JsonSerializer.Serialize(config, _jsonOptions);
             File.WriteAllText(_configPath, json);
+
+            // Restore in-memory values so the running app still works
+            agent.Endpoint = savedEndpoint;
+            agent.ApiKey = savedApiKey;
+            agent.WhisperEndpoint = savedWhisperEndpoint;
+            agent.WhisperApiKey = savedWhisperApiKey;
+
             _config = config;
             _lastModified = DateTime.UtcNow;
         }
@@ -110,6 +157,9 @@ public class ConfigService
             var json = File.ReadAllText(_configPath);
             _lastModified = File.GetLastWriteTimeUtc(_configPath);
             var config = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions) ?? CreateDefaultConfig();
+
+            // Merge secrets from secrets.json (survives bin wipes)
+            LoadSecrets(config.AgentSettings);
             
             // Upgrade old schemas if needed
             var upgradeCount = 0;
@@ -141,6 +191,76 @@ public class ConfigService
         }
     }
     
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SECRETS — stored in .kv/store.dat next to config.json, folder is .gitignored
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Loads secrets from secrets.json and merges into the AgentSettings.
+    /// Secrets override empty config values — if a user has keys in secrets.json,
+    /// they're applied even when config.json has empty placeholders.
+    /// </summary>
+    private void LoadSecrets(AgentSettings agent)
+    {
+        try
+        {
+            if (!File.Exists(_secretsPath)) return;
+
+            var json = File.ReadAllText(_secretsPath);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("endpoint", out var ep) && ep.GetString() is string endpoint && !string.IsNullOrWhiteSpace(endpoint))
+                agent.Endpoint = endpoint;
+
+            if (root.TryGetProperty("apiKey", out var ak) && ak.GetString() is string apiKey && !string.IsNullOrWhiteSpace(apiKey))
+                agent.ApiKey = apiKey;
+
+            if (root.TryGetProperty("whisperEndpoint", out var wep) && wep.GetString() is string whisperEndpoint && !string.IsNullOrWhiteSpace(whisperEndpoint))
+                agent.WhisperEndpoint = whisperEndpoint;
+
+            if (root.TryGetProperty("whisperApiKey", out var wak) && wak.GetString() is string whisperApiKey && !string.IsNullOrWhiteSpace(whisperApiKey))
+                agent.WhisperApiKey = whisperApiKey;
+
+            System.Diagnostics.Debug.WriteLine($"[ConfigService] Secrets loaded from: {_secretsPath}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ConfigService] Failed to load secrets: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Saves secrets to secrets.json. Only writes non-empty values.
+    /// </summary>
+    private void SaveSecrets(AgentSettings agent)
+    {
+        try
+        {
+            var secrets = new Dictionary<string, string>();
+
+            if (!string.IsNullOrWhiteSpace(agent.Endpoint))
+                secrets["endpoint"] = agent.Endpoint;
+            if (!string.IsNullOrWhiteSpace(agent.ApiKey))
+                secrets["apiKey"] = agent.ApiKey;
+            if (!string.IsNullOrWhiteSpace(agent.WhisperEndpoint))
+                secrets["whisperEndpoint"] = agent.WhisperEndpoint;
+            if (!string.IsNullOrWhiteSpace(agent.WhisperApiKey))
+                secrets["whisperApiKey"] = agent.WhisperApiKey;
+
+            if (secrets.Count > 0)
+            {
+                var json = JsonSerializer.Serialize(secrets, _jsonOptions);
+                File.WriteAllText(_secretsPath, json);
+                System.Diagnostics.Debug.WriteLine($"[ConfigService] Secrets saved to: {_secretsPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ConfigService] Failed to save secrets: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Backs up a corrupted config file for debugging.
     /// </summary>

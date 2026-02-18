@@ -105,8 +105,9 @@ public class Rule : System.ComponentModel.INotifyPropertyChanged
     
     /// <summary>
     /// Raises PropertyChanged for the specified property name.
+    /// Public so that the engine can fire notifications on the UI thread.
     /// </summary>
-    protected void OnPropertyChanged(string propertyName) =>
+    public void OnPropertyChanged(string propertyName) =>
         PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -213,6 +214,27 @@ public class Rule : System.ComponentModel.INotifyPropertyChanged
     /// Only trigger if the target window has keyboard focus.
     /// </summary>
     public bool RequireFocus { get; set; }
+
+    /// <summary>
+    /// When true, the engine will attempt to scroll off-screen matching elements into view
+    /// before clicking. Uses UIA ScrollItemPattern, then ScrollPattern on ancestor,
+    /// then mouse-wheel fallback. Max 3 attempts per element per cycle.
+    /// </summary>
+    public bool ScrollIntoView { get; set; }
+
+    /// <summary>
+    /// Scroll direction to apply to the target window BEFORE scanning for elements.
+    /// Useful for Electron/Chromium apps (VS Code, Teams) where off-viewport elements
+    /// don't appear in the UIA tree at all.
+    /// Values: null/empty (disabled), "down", "up". Default: null.
+    /// </summary>
+    public string? PreScrollDirection { get; set; }
+
+    /// <summary>
+    /// Number of mouse-wheel notches to scroll when PreScrollDirection is set.
+    /// Each notch is 120 delta units (~3 lines). Default: 10 (a full page).
+    /// </summary>
+    public int PreScrollAmount { get; set; } = 10;
     
     /// <summary>
     /// Show confirmation dialog before executing the action.

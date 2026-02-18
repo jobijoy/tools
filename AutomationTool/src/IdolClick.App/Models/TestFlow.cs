@@ -35,28 +35,17 @@ internal static class FlowJson
 //
 // Design: Do NOT force all backends into one selector grammar.
 //   • Desktop UIA uses "ElementType#TextOrAutomationId"
-//   • Playwright uses CSS, role-based, label-based, text-based, or data-testid selectors
 //   • SelectorKind + Value = typed discriminated union
 // ═══════════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
 /// Discriminated union tag for selector types. Each backend supports a subset.
-/// Serialized as snake_case (e.g., "desktop_uia", "playwright_css").
+/// Serialized as snake_case (e.g., "desktop_uia").
 /// </summary>
 public enum SelectorKind
 {
     /// <summary>Desktop UIA selector: "ElementType#TextOrAutomationId".</summary>
-    DesktopUia,
-    /// <summary>Playwright CSS selector: "#id .class".</summary>
-    PlaywrightCss,
-    /// <summary>Playwright role-based: role + name (getByRole).</summary>
-    PlaywrightRole,
-    /// <summary>Playwright text selector: text=, hasText.</summary>
-    PlaywrightText,
-    /// <summary>Playwright label selector: getByLabel.</summary>
-    PlaywrightLabel,
-    /// <summary>Playwright data-testid selector (recommended for web).</summary>
-    PlaywrightTestId
+    DesktopUia
 }
 
 /// <summary>
@@ -72,10 +61,16 @@ public class StepSelector
     public string Value { get; set; } = "";
 
     /// <summary>
-    /// Optional extra qualifier (e.g., role name for PlaywrightRole,
-    /// hasText filter for PlaywrightCss).
+    /// Optional extra qualifier for advanced selector matching.
     /// </summary>
     public string? Extra { get; set; }
+
+    /// <summary>
+    /// When true, the selector identifier must match exactly (string.Equals)
+    /// instead of allowing prefix/StartsWith matching. Reduces false-positive
+    /// element resolution when multiple elements share similar names.
+    /// </summary>
+    public bool ExactMatch { get; set; }
 }
 
 /// <summary>
@@ -96,7 +91,8 @@ public enum StepAction
     Screenshot,
     Scroll,
     FocusWindow,
-    Launch
+    Launch,
+    Hover
 }
 
 /// <summary>
@@ -156,7 +152,7 @@ public class TestFlow
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     /// <summary>
-    /// Preferred automation backend: "desktop" (default) or "playwright".
+    /// Preferred automation backend: "desktop" (default).
     /// Individual steps can override via TypedSelector.Kind.
     /// </summary>
     public string Backend { get; set; } = "desktop";
@@ -262,7 +258,7 @@ public class TestStep
 
     /// <summary>
     /// Typed selector (optional). When set, takes precedence over the raw Selector string.
-    /// Enables backend-specific selector strategies (CSS, role, label, testid for Playwright).
+    /// Enables backend-specific selector strategies.
     /// If null, the Selector string is parsed as DesktopUia format for backward compatibility.
     /// </summary>
     public StepSelector? TypedSelector { get; set; }
@@ -389,7 +385,7 @@ public class ExecutionReport
 
 /// <summary>
 /// Result of executing a single test step.
-/// Enhanced with Playwright-inspired timing, retry, and element snapshot metadata.
+/// Enhanced with timing, retry, and element snapshot metadata.
 /// </summary>
 public class StepResult
 {
@@ -479,15 +475,9 @@ public class StepResult
     /// <summary>
     /// Backend-internal call log entries showing auto-wait reasons, retry events,
     /// scroll-into-view attempts, and other behind-the-scenes activity.
-    /// Inspired by Playwright trace viewer's "logs" panel.
+    /// Internal backend call log entries.
     /// </summary>
     public List<BackendCallLogEntry> BackendCallLog { get; set; } = [];
-
-    /// <summary>
-    /// Path to a trace artifact (e.g., Playwright trace.zip) captured during this step.
-    /// Null for backends that don't support tracing.
-    /// </summary>
-    public string? TraceArtifactPath { get; set; }
 
     /// <summary>
     /// Metadata about how the selector was resolved (match count, final target info).
@@ -572,7 +562,7 @@ public class ElementBounds
 
 /// <summary>
 /// A single log entry from the backend's internal execution (auto-wait, scroll, retry).
-/// Maps to Playwright trace viewer's action log panel.
+/// A single log entry from the backend's internal execution trace.
 /// </summary>
 public class BackendCallLogEntry
 {

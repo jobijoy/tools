@@ -1,0 +1,45 @@
+# Build outputs
+bin/
+obj/
+publish/
+out/
+TestResults/
+
+# IDE
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/repositories.config
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Installer output
+installer/output/
+
+# Logs (keep directory, ignore contents)
+logs/
+*.log
+
+# Runtime config overrides
+config.json
+!installer/assets/sample-config.json
+
+# wwwroot build artifacts
+wwwroot/
+
+# Secrets
+*.pfx
+*.key
+appsettings.*.json

@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/jobijoy/IdolClick/main/schemas/pack-report.schema.json",
+  "title": "IdolClick PackReport v1",
+  "description": "Structured execution report for a TestPack run. Contains summary, coverage map, failures with evidence, warnings, ranked fix queue, and perception channel statistics.",
+  "type": "object",
+  "required": ["schemaVersion", "packId", "runId", "startedAtUtc", "endedAtUtc", "summary"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "packId": { "type": "string" },
+    "packName": { "type": "string" },
+    "runId": { "type": "string", "format": "uuid" },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "endedAtUtc": { "type": "string", "format": "date-time" },
+    "totalTimeMs": { "type": "integer", "minimum": 0 },
+    "environment": { "$ref": "#/$defs/PackEnvironment" },
+    "summary": { "$ref": "#/$defs/PackSummary" },
+    "coverageMap": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CoverageMapEntry" }
+    },
+    "journeyResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/JourneyResult" }
+    },
+    "failures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/PackFailure" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/PackWarning" }
+    },
+    "fixQueue": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FixQueueItem" },
+      "description": "Ranked actionable items for coding agents."
+    },
+    "perceptionStats": { "$ref": "#/$defs/PerceptionStats" },
+    "flowReports": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Per-flow ExecutionReport objects (pass-through)."
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "PerceptionMode": {
+      "type": "string",
+      "enum": ["structural", "visual", "structural_first", "dual", "auto"]
+    },
+
+    "PackEnvironment": {
+      "type": "object",
+      "properties": {
+        "osVersion": { "type": "string" },
+        "machine": { "type": "string" },
+
+        "backendVersions": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "PackSummary": {
+      "type": "object",
+      "required": ["journeysTotal", "overallResult"],
+      "properties": {
+        "journeysTotal": { "type": "integer", "minimum": 0 },
+        "journeysPassed": { "type": "integer", "minimum": 0 },
+        "journeysFailed": { "type": "integer", "minimum": 0 },
+        "journeysSkipped": { "type": "integer", "minimum": 0 },
+        "flowsTotal": { "type": "integer", "minimum": 0 },
+        "stepsTotal": { "type": "integer", "minimum": 0 },
+        "warningsTotal": { "type": "integer", "minimum": 0 },
+        "overallResult": {
+          "type": "string",
+          "enum": ["passed", "failed", "partial", "aborted", "pending"]
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "CoverageMapEntry": {
+      "type": "object",
+      "required": ["area"],
+      "properties": {
+        "area": { "type": "string" },
+        "journeys": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["ok", "gap", "partial"] }
+      },
+      "additionalProperties": false
+    },
+
+    "JourneyResult": {
+      "type": "object",
+      "required": ["journeyId", "result"],
+      "properties": {
+        "journeyId": { "type": "string" },
+        "title": { "type": "string" },
+        "result": { "type": "string", "enum": ["passed", "failed", "skipped", "aborted", "pending"] },
+        "flowIds": { "type": "array", "items": { "type": "string" } },
+        "totalTimeMs": { "type": "integer", "minimum": 0 },
+        "criteriaResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "passed": { "type": "boolean" },
+              "description": { "type": ["string", "null"] },
+              "expected": { "type": ["string", "null"] },
+              "observed": { "type": ["string", "null"] },
+              "perceptionUsed": { "$ref": "#/$defs/PerceptionMode" }
+            },
+            "required": ["passed"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "PackFailure": {
+      "type": "object",
+      "required": ["journeyId", "flowId", "stepOrder", "failureType"],
+      "properties": {
+        "journeyId": { "type": "string" },
+        "flowId": { "type": "string" },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "failureType": {
+          "type": "string",
+          "enum": ["assertion_failed", "element_not_found", "timeout", "error", "guardrail_violation"]
+        },
+        "expected": { "type": "string" },
+        "observed": { "type": "string" },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "screenshot": { "type": ["string", "null"] },
+            "uiaTreeSnapshot": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "repro": {
+          "type": "object",
+          "properties": {
+            "attempts": { "type": "integer", "minimum": 0 },
+            "failedAttempts": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "perceptionUsed": { "$ref": "#/$defs/PerceptionMode" }
+      },
+      "additionalProperties": false
+    },
+
+    "PackWarning": {
+      "type": "object",
+      "required": ["flowId", "stepOrder", "code"],
+      "properties": {
+        "flowId": { "type": "string" },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "code": {
+          "type": "string",
+          "enum": ["vision_fallback_used", "perception_downgrade", "slow_step", "structural_fallback", "dom_snapshot_large"]
+        },
+        "details": { "type": "string" },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "perceptionMode": { "$ref": "#/$defs/PerceptionMode" }
+      },
+      "additionalProperties": false
+    },
+
+    "FixQueueItem": {
+      "type": "object",
+      "required": ["rank", "category", "title"],
+      "properties": {
+        "rank": { "type": "integer", "minimum": 1 },
+        "category": {
+          "type": "string",
+          "enum": ["ui_regression", "logic_error", "flaky_selector", "timing_issue", "data_mismatch", "layout_shift", "accessibility_gap"]
+        },
+        "title": { "type": "string" },
+        "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+        "likelyCauses": { "type": "array", "items": { "type": "string" } },
+        "recommendedNextChecks": { "type": "array", "items": { "type": "string" } },
+        "fixPacket": {
+          "type": "object",
+          "properties": {
+            "summary": { "type": "string" },
+            "evidenceFilePaths": { "type": "array", "items": { "type": "string" } },
+            "suspectedCauses": { "type": "array", "items": { "type": "string" } },
+            "reproSteps": { "type": "array", "items": { "type": "string" } },
+            "suggestedFilesToInspect": { "type": "array", "items": { "type": "string" } },
+            "evidenceChannels": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "PerceptionStats": {
+      "type": "object",
+      "description": "Statistics about how the Eye perceived the application during execution.",
+      "properties": {
+        "structuralCaptures": { "type": "integer", "minimum": 0 },
+        "visualCaptures": { "type": "integer", "minimum": 0 },
+        "dualCaptures": { "type": "integer", "minimum": 0 },
+        "structuralToVisualFallbacks": { "type": "integer", "minimum": 0 },
+        "estimatedCostUnits": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://idolclick.dev/schemas/v1/test-flow.schema.json",
+  "$id": "https://raw.githubusercontent.com/jobijoy/IdolClick/main/schemas/test-flow.schema.json",
   "title": "IdolClick Test Flow v1",
   "description": "Deterministic UI automation flow — the exchange format between AI coding agents and IdolClick execution engine.",
   "type": "object",
@@ -45,6 +45,17 @@
       "type": "string",
       "format": "date-time",
       "description": "ISO 8601 timestamp of when the flow was created."
+    },
+    "backend": {
+      "type": "string",
+      "enum": ["desktop"],
+      "default": "desktop",
+      "description": "Automation backend. Currently only desktop (UIA) is supported."
+    },
+    "targetLock": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, the executor pins to the initial target window handle. Prevents clicking the wrong window if focus shifts."
     }
   },
   "additionalProperties": false,
@@ -88,6 +99,21 @@
       "type": "string",
       "pattern": "^([A-Za-z]+)?#.+$",
       "description": "UI element selector. Format: 'ElementType#TextOrAutomationId'. Examples: 'Button#Save', 'TextBox#SearchField', '#AutomationId'."
+    },
+    "SelectorKind": {
+      "type": "string",
+      "enum": ["desktop_uia"],
+      "description": "Discriminated union tag for selector types. Currently only desktop_uia is supported."
+    },
+    "TypedSelector": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/SelectorKind" },
+        "value": { "type": "string", "minLength": 1, "description": "The selector value (format depends on kind)." },
+        "extra": { "type": "string", "description": "Optional extra qualifier for the selector." }
+      },
+      "additionalProperties": false
     },
     "Assertion": {
       "type": "object",
@@ -209,6 +235,10 @@
           "type": "array",
           "items": { "$ref": "#/$defs/Assertion" },
           "description": "Post-step assertions. Evaluated after the action completes."
+        },
+        "typedSelector": {
+          "$ref": "#/$defs/TypedSelector",
+          "description": "Typed selector (optional). When set, takes precedence over the raw selector string. Enables backend-specific selector strategies."
         }
       },
       "allOf": [

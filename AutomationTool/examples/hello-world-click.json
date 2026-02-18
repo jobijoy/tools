@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "testName": "Hello World — Click a Button",
+  "description": "Minimal example: launch Notepad and click the File menu. Shows the Click action with a UIA selector.",
+  "targetApp": "notepad",
+  "stopOnFailure": true,
+  "timeoutSeconds": 30,
+  "steps": [
+    {
+      "order": 1,
+      "action": "launch",
+      "processPath": "notepad.exe",
+      "description": "Open Notepad",
+      "timeoutMs": 5000,
+      "delayAfterMs": 1000
+    },
+    {
+      "order": 2,
+      "action": "click",
+      "selector": "MenuItem#File",
+      "description": "Click the File menu",
+      "timeoutMs": 3000
+    },
+    {
+      "order": 3,
+      "action": "assert_exists",
+      "selector": "MenuItem#New Window",
+      "description": "Verify the File menu opened and 'New Window' is visible",
+      "timeoutMs": 3000
+    },
+    {
+      "order": 4,
+      "action": "send_keys",
+      "keys": "Escape",
+      "description": "Close the menu"
+    }
+  ]
+}

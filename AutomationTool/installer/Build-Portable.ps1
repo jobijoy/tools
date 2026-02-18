@@ -91,7 +91,7 @@ FILES:
 - logs/: Log files directory
 
 For full documentation, visit:
-https://github.com/jobijoy/tools
+https://github.com/jobijoy/IdolClick
 
 "@ | Set-Content (Join-Path $tempAppDir "README.txt")
 

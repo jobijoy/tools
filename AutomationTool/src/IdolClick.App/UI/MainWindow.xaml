@@ -3,10 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ctrl="clr-namespace:IdolClick.UI.Controls"
         mc:Ignorable="d"
-        Title="Idol Click" 
-        Height="420" Width="770"
-        MinHeight="280" MinWidth="580"
+        Title="Idol Click v1.0.0"
+        Height="580" Width="1060"
+        MinHeight="420" MinWidth="680"
         Background="{StaticResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/idol-click.png"
@@ -16,99 +17,73 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="ProfilePaneColumn" Width="180" MinWidth="120" MaxWidth="300"/>
+            <!-- Col 0: Activity Bar -->
+            <ColumnDefinition Width="48"/>
+            <!-- Col 1: Profile Pane (hidden until Classic mode) -->
+            <ColumnDefinition x:Name="ProfilePaneColumn" Width="0"/>
+            <!-- Col 2: Main Content -->
             <ColumnDefinition Width="*"/>
+            <!-- Col 3: Right Panel Splitter -->
+            <ColumnDefinition x:Name="RightSplitterCol" Width="0"/>
+            <!-- Col 4: Right Panel – Log / Timeline / Plugins -->
+            <ColumnDefinition x:Name="RightPanelColumn" Width="0"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
+            <!-- Row 0: Status Header -->
             <RowDefinition Height="Auto"/>
+            <!-- Row 1: Section Heading (mode breadcrumb) -->
+            <RowDefinition Height="Auto"/>
+            <!-- Row 2: Main Content -->
             <RowDefinition Height="*"/>
-            <RowDefinition x:Name="SplitterRow" Height="Auto"/>
-            <RowDefinition x:Name="LogPanelRow" Height="0"/>
+            <!-- Row 3: Footer -->
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Profile Pane (Left) - Spans all rows -->
-        <Border x:Name="ProfilePane" Grid.Column="0" Grid.RowSpan="5" 
-                Background="{StaticResource CardBrush}" 
-                Visibility="Visible">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                
-                <!-- Header -->
-                <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="14,12">
-                    <Grid>
-                        <TextBlock Text="Profiles" FontWeight="SemiBold" FontSize="13" 
-                                   Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
-                        <Button Content="✕" Style="{StaticResource SmallIconButton}" 
-                                HorizontalAlignment="Right" Click="HideProfilePane_Click"
-                                Width="22" Height="22" FontSize="11" Padding="0"
-                                ToolTip="Hide profile pane"/>
-                    </Grid>
+        <!-- ═══ Activity Bar ═══ -->
+        <Border Grid.Column="0" Grid.RowSpan="4" Background="{StaticResource ActivityBarBrush}">
+            <StackPanel VerticalAlignment="Top">
+                <Border Height="40" Margin="0,6,0,4">
+                    <TextBlock Text="⚙" FontSize="18" Foreground="{StaticResource PrimaryBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                
-                <!-- Profile List -->
-                <ListBox x:Name="ProfileListBox" Grid.Row="1" 
-                         Background="Transparent" BorderThickness="0"
-                         Foreground="{StaticResource TextBrush}"
-                         SelectionChanged="ProfileListBox_SelectionChanged"
-                         FontSize="12" Padding="8,6">
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="Padding" Value="12,10"/>
-                            <Setter Property="Margin" Value="0,2"/>
-                            <Setter Property="Cursor" Value="Hand"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" 
-                                                Padding="{TemplateBinding Padding}" CornerRadius="6">
-                                            <ContentPresenter/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBrush}"/>
-                                            </Trigger>
-                                            <MultiTrigger>
-                                                <MultiTrigger.Conditions>
-                                                    <Condition Property="IsMouseOver" Value="True"/>
-                                                    <Condition Property="IsSelected" Value="False"/>
-                                                </MultiTrigger.Conditions>
-                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                            </MultiTrigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                </ListBox>
-                
-                <!-- Profile Buttons -->
-                <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" Padding="12,10">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="＋" Style="{StaticResource SmallPrimaryButton}" 
-                                Click="NewProfile_Click" ToolTip="New profile" 
-                                Width="32" Height="28" Padding="0" FontSize="14"/>
-                        <Button Content="📋" Style="{StaticResource SmallIconButton}" 
-                                Click="DuplicateProfile_Click" ToolTip="Duplicate profile" 
-                                Width="32" Height="28" Padding="0" Margin="6,0,0,0"/>
-                        <Button Content="✎" Style="{StaticResource SmallIconButton}" 
-                                Click="RenameProfile_Click" ToolTip="Rename profile" 
-                                Width="32" Height="28" Padding="0" Margin="6,0,0,0"/>
-                        <Button Content="🗑" Style="{StaticResource SmallDangerButton}" 
-                                Click="DeleteProfile_Click" ToolTip="Delete profile" 
-                                Width="32" Height="28" Padding="0" Margin="6,0,0,0"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+
+                <RadioButton x:Name="NavClassic" IsChecked="True" Tag="Classic"
+                             Style="{StaticResource ActivityBarItem}"
+                             Click="NavMode_Click"
+                             ToolTip="⚡ Instinct — Rule-based automation">
+                    <TextBlock Text="⚡" FontSize="17"/>
+                </RadioButton>
+                <RadioButton x:Name="NavAgent" Tag="Agent"
+                             Style="{StaticResource ActivityBarItem}"
+                             Click="NavMode_Click"
+                             ToolTip="🧠 Reason — AI Agent mode">
+                    <TextBlock Text="🧠" FontSize="17"/>
+                </RadioButton>
+                <RadioButton x:Name="NavTeach" Tag="Teach"
+                             Style="{StaticResource ActivityBarItem}"
+                             Click="NavMode_Click"
+                             ToolTip="🎓 Teach — Smart Sentence Builder">
+                    <TextBlock Text="🎓" FontSize="17"/>
+                </RadioButton>
+
+                <Button Content="⚙" Width="48" Height="36"
+                        Style="{StaticResource IconButton}"
+                        Click="Settings_Click" Margin="0,6,0,0"
+                        ToolTip="Settings"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="{StaticResource TextSecondaryBrush}" FontSize="15"/>
+            </StackPanel>
         </Border>
 
-        <!-- Header -->
-        <Border Grid.Column="1" Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="16,12">
+        <!-- ═══ Profile Pane (Classic-only left sidebar) ═══ -->
+        <Border x:Name="ProfilePaneBorder" Grid.Column="1" Grid.RowSpan="4" Visibility="Collapsed">
+            <ctrl:ProfilePaneControl x:Name="ProfilePane"/>
+        </Border>
+
+        <!-- ═══ Status Header (spans content + right panel) ═══ -->
+        <Border Grid.Column="2" Grid.ColumnSpan="3" Grid.Row="0"
+                Background="{StaticResource SurfaceBrush}" Padding="14,9"
+                BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -116,375 +91,87 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Status & Stats -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Ellipse x:Name="StatusIndicator" Width="10" Height="10" Fill="{StaticResource ErrorBrush}" Margin="0,0,8,0"/>
-                    <TextBlock x:Name="StatusText" Text="Paused" Foreground="{StaticResource TextBrush}" FontSize="14" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="StatsText" Text=" • 0/0 rules" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    <Ellipse x:Name="StatusIndicator" Width="10" Height="10"
+                             Fill="{StaticResource ErrorBrush}" Margin="0,0,8,0"/>
+                    <TextBlock x:Name="StatusText" Text="Paused"
+                               Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="StatsText" Text=" • 0/0 running"
+                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}"
+                               Margin="8,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Mode Toggle -->
-                <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Background="{StaticResource CardBrush}" CornerRadius="14" Padding="2">
-                    <StackPanel Orientation="Horizontal">
-                        <Button x:Name="ClassicModeBtn" Content="📋 Classic" 
-                                Style="{StaticResource ModeToggleActive}"
-                                Click="ClassicMode_Click" ToolTip="Classic rule-based automation"/>
-                        <Button x:Name="AgentModeBtn" Content="🤖 Agent" 
-                                Style="{StaticResource ModeToggleInactive}"
-                                Click="AgentMode_Click" ToolTip="AI agent with natural language"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Compact Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
-                    <Button x:Name="ProfileToggleBtn" Content="📁" Width="32" Height="32" 
-                            Style="{StaticResource IconButton}" 
-                            Click="ToggleProfilePane_Click" 
-                            ToolTip="Show/hide profiles"/>
-                    
-                    <ToggleButton x:Name="AutomationToggle" 
-                                  Content="▶" 
-                                  Width="32" Height="32" 
-                                  ToolTip="Start/Stop all automation (Ctrl+Alt+T)"
+                    <Button x:Name="ProfileToggleBtn" Content="📁" Width="32" Height="32"
+                            Style="{StaticResource IconButton}"
+                            Click="ToggleProfilePane_Click"
+                            ToolTip="Show/hide profiles"
+                            Visibility="Collapsed"/>
+                    <ToggleButton x:Name="AutomationToggle"
+                                  Content="▶" Width="34" Height="32"
+                                  ToolTip="Start/Stop automation (Ctrl+Alt+T)"
                                   Click="AutomationToggle_Click"
-                                  Style="{StaticResource TogglePlayButton}"/>
-                    
-                    <Button x:Name="ExpandButton" Content="⚙" Width="32" Height="32" Margin="6,0,0,0"
-                            Style="{StaticResource IconButton}" 
-                            Click="Settings_Click" 
-                            ToolTip="Open settings"/>
+                                  Style="{StaticResource TogglePlayButton}"
+                                  Visibility="Collapsed"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Rules Panel (Classic Mode) -->
-        <Border x:Name="RulesPanel" Grid.Column="1" Grid.Row="1" Margin="8,6,8,4" Background="{StaticResource SurfaceBrush}" CornerRadius="6">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- Rules Toolbar - Compact -->
-                <Border Grid.Row="0" Background="{StaticResource CardBrush}" CornerRadius="6,6,0,0" Padding="8,4">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <!-- Search (expanded mode only) -->
-                        <Border x:Name="SearchPanel" Grid.Column="0" Visibility="Collapsed" 
-                                Background="{StaticResource SurfaceBrush}" CornerRadius="4" Padding="2" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🔍" VerticalAlignment="Center" Margin="4,0,4,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                <TextBox x:Name="SearchTextBox" Width="120" BorderThickness="0" Background="Transparent" 
-                                         VerticalAlignment="Center" TextChanged="SearchTextBox_TextChanged" FontSize="11"
-                                         ToolTip="Search rules (Esc to clear)"/>
-                            </StackPanel>
-                        </Border>
-                        
-                        <TextBlock Grid.Column="0" x:Name="RulesLabel" Text="Rules" FontSize="11" FontWeight="SemiBold" 
-                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                        
-                        <!-- Compact buttons -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="ImportBtn" Content="📥" Style="{StaticResource SmallIconButton}" Click="ImportRules_Click" ToolTip="Import rules from JSON file" Visibility="Collapsed"/>
-                            <Button x:Name="ExportBtn" Content="📤" Style="{StaticResource SmallIconButton}" Click="ExportRules_Click" ToolTip="Export rules to JSON file" Visibility="Collapsed" Margin="2,0,0,0"/>
-                            <Button Content="＋" Style="{StaticResource SmallPrimaryButton}" Click="AddRule_Click" ToolTip="Add new automation rule (Ctrl+N)" Margin="4,0,0,0"/>
-                            <Button x:Name="EditBtn" Content="✎" Style="{StaticResource SmallIconButton}" Click="EditRule_Click" ToolTip="Edit selected rule (Ctrl+E)" Visibility="Collapsed" Margin="2,0,0,0"/>
-                            <Button x:Name="DelBtn" Content="🗑" Style="{StaticResource SmallDangerButton}" Click="DeleteRule_Click" ToolTip="Delete selected rule (Del)" Visibility="Collapsed" Margin="2,0,0,0"/>
-                            <Button Content="↻" Style="{StaticResource SmallIconButton}" Click="ReloadConfig_Click" ToolTip="Reload configuration (F5)" Margin="2,0,0,0"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Compact Rules List -->
-                <ListView x:Name="RulesListView" Grid.Row="1" BorderThickness="0" SelectionMode="Single" 
-                          MouseDoubleClick="RulesListView_DoubleClick" SelectionChanged="RulesListView_SelectionChanged" FontSize="11">
-                    <ListView.View>
-                        <GridView x:Name="RulesGridView">
-                            <!-- Status Indicator Column -->
-                            <GridViewColumn x:Name="ColStatus" Header="" Width="22">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Ellipse Width="8" Height="8" ToolTip="{Binding StatusTooltip}">
-                                            <Ellipse.Fill>
-                                                <SolidColorBrush Color="{Binding StatusColor}"/>
-                                            </Ellipse.Fill>
-                                        </Ellipse>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                            <!-- Enable Checkbox Column -->
-                            <GridViewColumn Header="" Width="28">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <CheckBox IsChecked="{Binding Enabled}" 
-                                                  Checked="RuleEnabled_Changed" 
-                                                  Unchecked="RuleEnabled_Changed"
-                                                  ToolTip="Enable or disable this rule (saved in config)"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                            <!-- Play/Pause Button Column -->
-                            <GridViewColumn Header="" Width="26">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Button Content="{Binding RunStateIcon}" 
-                                                Click="RuleRunToggle_Click" 
-                                                Tag="{Binding}"
-                                                Style="{StaticResource SmallIconButton}" 
-                                                Width="22" Height="20" FontSize="10" Padding="0"
-                                                ToolTip="{Binding RunStateTooltip}"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                            <GridViewColumn x:Name="ColName" Header="Name" Width="110" DisplayMemberBinding="{Binding Name}"/>
-                            <GridViewColumn x:Name="ColApp" Header="App" Width="70" DisplayMemberBinding="{Binding TargetApp}"/>
-                            <GridViewColumn x:Name="ColMatch" Header="Match" Width="90" DisplayMemberBinding="{Binding MatchText}"/>
-                            <GridViewColumn x:Name="ColAction" Header="Action" Width="55" DisplayMemberBinding="{Binding Action}"/>
-                            <GridViewColumn x:Name="ColCooldown" Header="CD" Width="30" DisplayMemberBinding="{Binding CooldownSeconds, StringFormat={}{0}s}"/>
-                            <!-- Session Execution Count Column -->
-                            <GridViewColumn x:Name="ColSessionExec" Header="" Width="35">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding SessionExecutionDisplay}" 
-                                                   Foreground="{StaticResource AccentBrush}" 
-                                                   FontSize="10"
-                                                   ToolTip="Executions this session (resets on restart)"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                            <GridViewColumn x:Name="ColTriggers" Header="#" Width="25" DisplayMemberBinding="{Binding TriggerCount}"/>
-                            <GridViewColumn x:Name="ColLastTrigger" Header="Last" Width="55">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding LastTriggered, StringFormat={}{0:HH:mm:ss}, TargetNullValue=-}"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
+        <!-- ═══ Section Heading — mode breadcrumb ═══ -->
+        <Border Grid.Column="2" Grid.ColumnSpan="3" Grid.Row="1"
+                Background="{StaticResource CardBrush}"
+                BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderSubtleBrush}">
+            <Grid Margin="14,8,14,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Accent indicator (color varies per mode) -->
+                    <Border x:Name="SectionAccent" Width="3" MinHeight="26" CornerRadius="2"
+                            Background="{StaticResource PrimaryBrush}" Margin="0,0,12,0"
+                            VerticalAlignment="Stretch"/>
+                    <!-- Mode icon -->
+                    <TextBlock x:Name="SectionIcon" Text="⚡" FontSize="16"
+                               VerticalAlignment="Center" Margin="0,0,9,0"/>
+                    <!-- Title + subtitle -->
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="SectionTitle" Text="Instinct"
+                                   FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}"/>
+                        <TextBlock x:Name="SectionSubtitle"
+                                   Text="Rule-based automation with profiles and rules"
+                                   FontSize="{StaticResource FontSizeSmall}" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Agent Chat Panel (Agent Mode) - full area with optional side panel -->
-        <Grid x:Name="AgentChatPanel" Grid.Column="1" Grid.Row="1" Grid.RowSpan="3" 
-              Visibility="Collapsed">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="300"/>
-                <ColumnDefinition x:Name="AgentLogSplitterCol" Width="Auto"/>
-                <ColumnDefinition x:Name="AgentLogPanelCol" Width="350" MinWidth="200" MaxWidth="600"/>
-            </Grid.ColumnDefinitions>
+        <!-- ═══ Rules Panel (Classic — Col 2, Row 2) ═══ -->
+        <Border x:Name="RulesPanelBorder" Grid.Column="2" Grid.Row="2"
+                Margin="6,6,4,6" CornerRadius="6">
+            <ctrl:RulesPanelControl x:Name="RulesPanel"/>
+        </Border>
 
-            <!-- Chat area (left) -->
-            <Border Grid.Column="0" Margin="8,6,4,4" 
-                    Background="{StaticResource SurfaceBrush}" CornerRadius="6">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+        <!-- ═══ Agent Chat (Agent — Col 2, Row 2) ═══ -->
+        <ctrl:AgentChatControl x:Name="AgentChatPanel"
+                               Grid.Column="2" Grid.Row="2"
+                               Visibility="Collapsed"/>
 
-                    <!-- Chat Header -->
-                    <Border Grid.Row="0" Background="{StaticResource CardBrush}" CornerRadius="6,6,0,0" Padding="12,8">
-                        <Grid>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="🤖" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <TextBlock Text="Agent" FontSize="12" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="AgentStatusText" Text="  •  Not connected" FontSize="10" 
-                                           Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                <Button Content="📂" Style="{StaticResource SmallIconButton}" 
-                                        Click="LoadFlow_Click" 
-                                        ToolTip="Load flow from JSON file" Width="24" Height="22" Margin="0,0,2,0"/>
-                                <Button Content="📋" Style="{StaticResource SmallIconButton}" 
-                                        Click="PasteFlow_Click" 
-                                        ToolTip="Paste flow from clipboard" Width="24" Height="22" Margin="0,0,2,0"/>
-                                <Button x:Name="ToggleAgentLogBtn" Content="📊" Style="{StaticResource SmallIconButton}" 
-                                        Click="ToggleAgentLog_Click" 
-                                        ToolTip="Toggle log panel" Width="24" Height="22" Margin="0,0,2,0"/>
-                                <Button Content="🗑" Style="{StaticResource SmallIconButton}" 
-                                        HorizontalAlignment="Right" Click="ClearChat_Click" 
-                                        ToolTip="Clear conversation" Width="24" Height="22"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
+        <!-- ═══ Teach Panel (Teach — Col 2, Row 2) ═══ -->
+        <Border x:Name="TeachPanelBorder" Grid.Column="2" Grid.Row="2"
+                Visibility="Collapsed" Margin="6,6,6,6" CornerRadius="6">
+            <ctrl:TeachPanelControl x:Name="TeachPanel"/>
+        </Border>
 
-                    <!-- Chat Messages -->
-                    <ScrollViewer x:Name="ChatScrollViewer" Grid.Row="1" 
-                                  VerticalScrollBarVisibility="Auto" 
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  Background="{StaticResource SurfaceBrush}">
-                        <StackPanel x:Name="ChatMessagesPanel" Margin="0,4,0,4"/>
-                    </ScrollViewer>
+        <!-- ═══ Right GridSplitter (Classic mode) ═══ -->
+        <GridSplitter x:Name="RightSplitter" Grid.Column="3" Grid.Row="2"
+                      Width="5" VerticalAlignment="Stretch" HorizontalAlignment="Center"
+                      Background="{StaticResource SurfaceBrush}" Visibility="Collapsed"
+                      ResizeDirection="Columns"/>
 
-                <!-- Welcome Message (shown when chat is empty) -->
-                <StackPanel x:Name="AgentWelcomePanel" Grid.Row="1" 
-                            VerticalAlignment="Center" HorizontalAlignment="Center" Margin="30">
-                    <TextBlock Text="🤖" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                    <TextBlock Text="IdolClick Agent" FontSize="16" FontWeight="SemiBold" 
-                               Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                    <TextBlock Text="Describe what you want to automate in plain English." 
-                               FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" 
-                               HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,16"/>
-                    <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" 
-                               HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
-                               LineHeight="20">
-                        <Run Text="Try:"/><LineBreak/>
-                        <Run Text="• &#x22;Click the Allow button in VS Code every 5 seconds&#x22;" Foreground="{StaticResource AccentBrush}"/><LineBreak/>
-                        <Run Text="• &#x22;List all my current rules&#x22;" Foreground="{StaticResource AccentBrush}"/><LineBreak/>
-                        <Run Text="• &#x22;What windows are open right now?&#x22;" Foreground="{StaticResource AccentBrush}"/>
-                    </TextBlock>
-                    <Border Margin="0,20,0,0" Padding="8,6" Background="{StaticResource CardBrush}" CornerRadius="4">
-                        <TextBlock FontSize="10" Foreground="{StaticResource WarningBrush}" 
-                                   HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center">
-                            <Run Text="⚙ Configure your LLM endpoint in Settings to get started."/>
-                        </TextBlock>
-                    </Border>
-                </StackPanel>
+        <!-- ═══ Right Panel: Log / Timeline / Plugins (Classic mode) ═══ -->
+        <Border x:Name="RightPanel" Grid.Column="4" Grid.Row="2"
+                Margin="4,6,6,6" Background="{StaticResource SurfaceBrush}"
+                CornerRadius="6" Visibility="Collapsed">
+            <TabControl x:Name="BottomTabs" Background="Transparent" BorderThickness="0" FontSize="{StaticResource FontSizeSmall}">
 
-                <!-- Chat Input -->
-                <Border Grid.Row="2" Background="{StaticResource CardBrush}" Padding="8" CornerRadius="0,0,6,6">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="ChatInputBox" Grid.Column="0" 
-                                 FontSize="12" Padding="10,8" 
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 MinHeight="34" MaxHeight="120"
-                                 KeyDown="ChatInput_KeyDown"
-                                 TextChanged="ChatInput_TextChanged"
-                                 VerticalAlignment="Stretch">
-                            <TextBox.Style>
-                                <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                    <Setter Property="Tag" Value="Ask the agent anything... (Shift+Enter for new line)"/>
-                                </Style>
-                            </TextBox.Style>
-                        </TextBox>
-                        <Button x:Name="ChatSendBtn" Grid.Column="1" Content="➤" 
-                                Style="{StaticResource SmallPrimaryButton}" 
-                                Click="ChatSend_Click" 
-                                Width="36" Height="34" FontSize="14" Margin="6,0,0,0"
-                                ToolTip="Send message (Enter)"
-                                VerticalAlignment="Bottom"
-                                IsEnabled="False"/>
-                    </Grid>
-                </Border>
-                </Grid>
-            </Border>
-
-            <!-- Vertical Splitter -->
-            <GridSplitter x:Name="AgentLogSplitter" Grid.Column="1" Width="5" 
-                          HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                          Background="{StaticResource SurfaceBrush}" Cursor="SizeWE"/>
-
-            <!-- Right Side Panel: Log / Timeline / Plugins -->
-            <Border x:Name="AgentLogPanel" Grid.Column="2" Margin="4,6,8,4" 
-                    Background="{StaticResource SurfaceBrush}" CornerRadius="6">
-                <TabControl x:Name="AgentSideTabs" Background="Transparent" BorderThickness="0" FontSize="11">
-                    
-                    <!-- Log Tab -->
-                    <TabItem Header="📋 Log">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="8,4">
-                                <Grid>
-                                    <StackPanel Orientation="Horizontal">
-                                        <ComboBox x:Name="AgentLogLevelCombo" Width="70" FontSize="10" SelectionChanged="AgentLogLevel_Changed">
-                                            <ComboBoxItem Content="Debug"/>
-                                            <ComboBoxItem Content="Info" IsSelected="True"/>
-                                            <ComboBoxItem Content="Warning"/>
-                                            <ComboBoxItem Content="Error"/>
-                                        </ComboBox>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button Content="Clear" Style="{StaticResource SmallButton}" Click="ClearAgentLog_Click" Margin="0,0,4,0"/>
-                                        <Button Content="Open" Style="{StaticResource SmallButton}" Click="OpenLogFile_Click"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <ListBox x:Name="AgentLogListBox" Grid.Row="1" BorderThickness="0" 
-                                     Background="{StaticResource SurfaceBrush}" 
-                                     Foreground="{StaticResource TextBrush}"
-                                     FontFamily="Consolas" FontSize="10"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-                        </Grid>
-                    </TabItem>
-                    
-                    <!-- Timeline Tab -->
-                    <TabItem Header="📊 Timeline">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="8,4">
-                                <Grid>
-                                    <ComboBox x:Name="AgentTimelineFilterCombo" Width="100" FontSize="10" SelectionChanged="AgentTimelineFilter_Changed">
-                                        <ComboBoxItem Content="All" IsSelected="True" Tag=""/>
-                                        <ComboBoxItem Content="Matches" Tag="RuleMatch"/>
-                                        <ComboBoxItem Content="Actions" Tag="Action"/>
-                                    </ComboBox>
-                                    <Button Content="Clear" Style="{StaticResource SmallButton}" HorizontalAlignment="Right" Click="ClearAgentTimeline_Click"/>
-                                </Grid>
-                            </Border>
-
-                            <ListView x:Name="AgentTimelineListView" Grid.Row="1" BorderThickness="0"
-                                      Background="{StaticResource SurfaceBrush}" FontSize="10">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="" Width="20">
-                                            <GridViewColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding Icon}" FontSize="10"/>
-                                                </DataTemplate>
-                                            </GridViewColumn.CellTemplate>
-                                        </GridViewColumn>
-                                        <GridViewColumn Header="Time" Width="50">
-                                            <GridViewColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" 
-                                                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                                                </DataTemplate>
-                                            </GridViewColumn.CellTemplate>
-                                        </GridViewColumn>
-                                        <GridViewColumn Header="Event" Width="200" DisplayMemberBinding="{Binding Message}"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
-                        </Grid>
-                    </TabItem>
-                </TabControl>
-            </Border>
-        </Grid>
-
-        <!-- Splitter (expanded mode only) -->
-        <GridSplitter x:Name="PanelSplitter" Grid.Column="1" Grid.Row="2" Height="5" HorizontalAlignment="Stretch" 
-                      Background="{StaticResource SurfaceBrush}" Visibility="Collapsed"/>
-
-        <!-- Log & Details Panel (expanded mode only) -->
-        <Border x:Name="LogPanel" Grid.Column="1" Grid.Row="3" Margin="8,2,8,6" Background="{StaticResource SurfaceBrush}" CornerRadius="6" Visibility="Collapsed">
-            <TabControl x:Name="BottomTabs" Background="Transparent" BorderThickness="0" FontSize="11">
-                
-                <!-- Log Tab -->
                 <TabItem Header="📋 Log">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -495,29 +182,52 @@
                         <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="8,4">
                             <Grid>
                                 <StackPanel Orientation="Horizontal">
-                                    <ComboBox x:Name="LogLevelCombo" Width="70" FontSize="10" SelectionChanged="LogLevel_Changed">
+                                    <ComboBox x:Name="LogLevelCombo" Width="70" FontSize="{StaticResource FontSizeTiny}"
+                                              SelectionChanged="LogLevel_Changed">
+                                        <ComboBoxItem Content="All" IsSelected="True"/>
                                         <ComboBoxItem Content="Debug"/>
-                                        <ComboBoxItem Content="Info" IsSelected="True"/>
+                                        <ComboBoxItem Content="Info"/>
                                         <ComboBoxItem Content="Warning"/>
                                         <ComboBoxItem Content="Error"/>
                                     </ComboBox>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button Content="Clear" Style="{StaticResource SmallButton}" Click="ClearLog_Click" Margin="0,0,4,0"/>
-                                    <Button Content="Open" Style="{StaticResource SmallButton}" Click="OpenLogFile_Click"/>
+                                    <Button Content="Clear" Style="{StaticResource SmallButton}"
+                                            Click="ClearLog_Click" Margin="0,0,4,0"/>
+                                    <Button Content="Open" Style="{StaticResource SmallButton}"
+                                            Click="OpenLogFile_Click"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
 
-                        <ListBox x:Name="LogListBox" Grid.Row="1" BorderThickness="0" 
-                                 Background="{StaticResource SurfaceBrush}" 
+                        <ListBox x:Name="LogListBox" Grid.Row="1" BorderThickness="0"
+                                 Background="{StaticResource SurfaceBrush}"
                                  Foreground="{StaticResource TextBrush}"
-                                 FontFamily="Consolas" FontSize="10"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                                 FontSize="{StaticResource FontSizeMicro}"
+                                 SelectionMode="Extended"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="FontSize" Value="{StaticResource FontSizeMicro}"/>
+                                    <Setter Property="Padding" Value="3,1"/>
+                                    <Setter Property="Margin" Value="0"/>
+                                    <Setter Property="MinHeight" Value="0"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="📋 Copy Selected" Click="CopySelectedLog_Click"
+                                              InputGestureText="Ctrl+C"/>
+                                    <MenuItem Header="📋 Copy All" Click="CopyAllLog_Click"/>
+                                    <Separator/>
+                                    <MenuItem Header="Select All" Click="SelectAllLog_Click"
+                                              InputGestureText="Ctrl+A"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                        </ListBox>
                     </Grid>
                 </TabItem>
-                
-                <!-- Timeline Tab -->
+
                 <TabItem Header="📊 Timeline">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -527,42 +237,46 @@
 
                         <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="8,4">
                             <Grid>
-                                <ComboBox x:Name="TimelineFilterCombo" Width="100" FontSize="10" SelectionChanged="TimelineFilter_Changed">
+                                <ComboBox x:Name="TimelineFilterCombo" Width="100" FontSize="{StaticResource FontSizeTiny}"
+                                          SelectionChanged="TimelineFilter_Changed">
                                     <ComboBoxItem Content="All" IsSelected="True" Tag=""/>
                                     <ComboBoxItem Content="Matches" Tag="RuleMatch"/>
                                     <ComboBoxItem Content="Actions" Tag="Action"/>
                                 </ComboBox>
-                                <Button Content="Clear" Style="{StaticResource SmallButton}" HorizontalAlignment="Right" Click="ClearTimeline_Click"/>
+                                <Button Content="Clear" Style="{StaticResource SmallButton}"
+                                        HorizontalAlignment="Right" Click="ClearTimeline_Click"/>
                             </Grid>
                         </Border>
 
                         <ListView x:Name="TimelineListView" Grid.Row="1" BorderThickness="0"
-                                  Background="{StaticResource SurfaceBrush}" FontSize="10">
+                                  Background="{StaticResource SurfaceBrush}" FontSize="{StaticResource FontSizeMicro}">
                             <ListView.View>
                                 <GridView>
-                                    <GridViewColumn Header="" Width="24">
+                                    <GridViewColumn Header="" Width="22">
                                         <GridViewColumn.CellTemplate>
                                             <DataTemplate>
-                                                <TextBlock Text="{Binding Icon}" FontSize="11"/>
+                                                <TextBlock Text="{Binding Icon}" FontSize="{StaticResource FontSizeTiny}"/>
                                             </DataTemplate>
                                         </GridViewColumn.CellTemplate>
                                     </GridViewColumn>
-                                    <GridViewColumn Header="Time" Width="55">
+                                    <GridViewColumn Header="Time" Width="54">
                                         <GridViewColumn.CellTemplate>
                                             <DataTemplate>
-                                                <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"/>
                                             </DataTemplate>
                                         </GridViewColumn.CellTemplate>
                                     </GridViewColumn>
-                                    <GridViewColumn Header="Rule" Width="80" DisplayMemberBinding="{Binding RuleName}"/>
-                                    <GridViewColumn Header="Event" Width="200" DisplayMemberBinding="{Binding Message}"/>
+                                    <GridViewColumn Header="Rule" Width="70"
+                                                    DisplayMemberBinding="{Binding RuleName}"/>
+                                    <GridViewColumn Header="Event" Width="160"
+                                                    DisplayMemberBinding="{Binding Message}"/>
                                 </GridView>
                             </ListView.View>
                         </ListView>
                     </Grid>
                 </TabItem>
-                
-                <!-- Plugins Tab -->
+
                 <TabItem Header="🔌 Plugins">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -572,28 +286,37 @@
 
                         <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="8,4">
                             <Grid>
-                                <TextBlock Text="Plugins" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                                <TextBlock Text="Plugins"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="{StaticResource FontSizeTiny}" VerticalAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button Content="↻" Style="{StaticResource SmallIconButton}" Click="RefreshPlugins_Click" Margin="0,0,4,0"/>
-                                    <Button Content="📂" Style="{StaticResource SmallIconButton}" Click="OpenPluginsFolder_Click"/>
+                                    <Button Content="↻" Style="{StaticResource SmallIconButton}"
+                                            Click="RefreshPlugins_Click" Margin="0,0,4,0"/>
+                                    <Button Content="📂" Style="{StaticResource SmallIconButton}"
+                                            Click="OpenPluginsFolder_Click"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
 
                         <ListView x:Name="PluginsListView" Grid.Row="1" BorderThickness="0"
-                                  Background="{StaticResource SurfaceBrush}" FontSize="10">
+                                  Background="{StaticResource SurfaceBrush}" FontSize="{StaticResource FontSizeTiny}">
                             <ListView.View>
                                 <GridView>
                                     <GridViewColumn Header="" Width="28">
                                         <GridViewColumn.CellTemplate>
                                             <DataTemplate>
-                                                <CheckBox IsChecked="{Binding Enabled}" Checked="PluginEnabled_Changed" Unchecked="PluginEnabled_Changed"/>
+                                                <CheckBox IsChecked="{Binding Enabled}"
+                                                          Checked="PluginEnabled_Changed"
+                                                          Unchecked="PluginEnabled_Changed"/>
                                             </DataTemplate>
                                         </GridViewColumn.CellTemplate>
                                     </GridViewColumn>
-                                    <GridViewColumn Header="Name" Width="100" DisplayMemberBinding="{Binding Name}"/>
-                                    <GridViewColumn Header="Type" Width="50" DisplayMemberBinding="{Binding Type}"/>
-                                    <GridViewColumn Header="Description" Width="180" DisplayMemberBinding="{Binding Description}"/>
+                                    <GridViewColumn Header="Name" Width="80"
+                                                    DisplayMemberBinding="{Binding Name}"/>
+                                    <GridViewColumn Header="Type" Width="45"
+                                                    DisplayMemberBinding="{Binding Type}"/>
+                                    <GridViewColumn Header="Description" Width="120"
+                                                    DisplayMemberBinding="{Binding Description}"/>
                                 </GridView>
                             </ListView.View>
                         </ListView>
@@ -602,40 +325,42 @@
             </TabControl>
         </Border>
 
-        <!-- Footer -->
-        <Border Grid.Column="1" Grid.Row="4" Background="{StaticResource SurfaceBrush}" Padding="16,10">
+        <!-- ═══ Footer (spans content + right panel) ═══ -->
+        <Border Grid.Column="2" Grid.ColumnSpan="3" Grid.Row="3"
+                Background="{StaticResource SurfaceBrush}" Padding="12,8"
+                BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="ProfileIndicator" Text="Default" 
-                               Foreground="{StaticResource AccentBrush}" 
-                               FontSize="11" FontWeight="SemiBold"
-                               VerticalAlignment="Center"
+                    <TextBlock x:Name="ProfileIndicator" Text="Default"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold" VerticalAlignment="Center"
                                ToolTip="Active profile"/>
-                    <TextBlock Text="  •  " Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="HotkeyHint" Text="Ctrl+Alt+T" 
-                               Foreground="{StaticResource TextSecondaryBrush}" 
-                               FontSize="11" 
-                               VerticalAlignment="Center"/>
-                    <TextBlock x:Name="IntervalText" Text="  •  10s" 
-                               Foreground="{StaticResource TextSecondaryBrush}" 
-                               FontSize="11" 
-                               VerticalAlignment="Center"/>
+                    <TextBlock Text="  •  " Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="HotkeyHint" Text="Ctrl+Alt+T"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="IntervalText" Text="  •  3s"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <ComboBox x:Name="IntervalCombo" Width="60" FontSize="10" Visibility="Collapsed"
-                              ToolTip="Polling interval" SelectionChanged="IntervalCombo_Changed">
+                    <ComboBox x:Name="IntervalCombo" Width="60" FontSize="{StaticResource FontSizeSmall}"
+                              Visibility="Collapsed"
+                              ToolTip="Polling interval"
+                              SelectionChanged="IntervalCombo_Changed">
                         <ComboBoxItem Content="1s" Tag="1000"/>
                         <ComboBoxItem Content="3s" Tag="3000" IsSelected="True"/>
                         <ComboBoxItem Content="5s" Tag="5000"/>
                         <ComboBoxItem Content="10s" Tag="10000"/>
                     </ComboBox>
-                    <TextBlock Text="v1.0.0" 
-                               Foreground="{StaticResource TextSecondaryBrush}" 
-                               FontSize="10" 
-                               VerticalAlignment="Center"
+                    <TextBlock Text="v1.0.0"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="{StaticResource FontSizeSmall}" VerticalAlignment="Center"
                                ToolTip="Idol Click v1.0.0"/>
                 </StackPanel>
             </Grid>
         </Border>
+
     </Grid>
 </Window>

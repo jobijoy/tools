@@ -1,0 +1,153 @@
+{
+  "$schema": "../../schemas/smoke-test.schema.json",
+  "schemaVersion": 1,
+  "description": "Level 2 — Desktop Application Workflows. Multi-step interactions across one or two desktop apps: chained calculations, text editing pipelines, file operations, and cross-app data transfer.",
+  "defaults": {
+    "timeoutSeconds": 240,
+    "screenshotAfterEachStep": true,
+    "delayBetweenStepsMs": 1200
+  },
+  "tests": [
+    {
+      "id": "L2-01",
+      "name": "Calculator Chain Math",
+      "description": "Computes (25 × 4) − 20 = 80 in Calculator using chained operations",
+      "difficulty": "Medium",
+      "steps": [
+        {
+          "prompt": "Open Calculator.",
+          "screenshotAfter": true,
+          "screenshotLabel": "calc-open"
+        },
+        {
+          "prompt": "In Calculator, compute 25 times 4. Tell me the intermediate result.",
+          "screenshotAfter": true,
+          "screenshotLabel": "calc-multiply",
+          "verifications": [
+            { "type": "ResponseContains", "target": "100", "description": "Intermediate result is 100" }
+          ]
+        },
+        {
+          "prompt": "Now subtract 20 from the result in Calculator. Tell me the final number on the display.",
+          "screenshotAfter": true,
+          "screenshotLabel": "calc-final"
+        }
+      ],
+      "verifications": [
+        { "type": "ResponseContains", "target": "80", "description": "Final result is 80" },
+        { "type": "ProcessRunning", "target": "CalculatorApp", "description": "Calculator still running" }
+      ],
+      "cleanupProcesses": ["CalculatorApp"]
+    },
+    {
+      "id": "L2-02",
+      "name": "Notepad Multi-Line Write and Read",
+      "description": "Types three lines in Notepad, then reads them back to verify content",
+      "difficulty": "Medium",
+      "steps": [
+        {
+          "prompt": "Open Notepad and type the following three lines exactly:\nLine 1: Desktop Automation\nLine 2: Multi-Step Test\nLine 3: Verification Pass",
+          "screenshotAfter": true,
+          "screenshotLabel": "notepad-typed",
+          "delayAfterMs": 1500
+        },
+        {
+          "prompt": "Read the text currently shown in Notepad. Tell me what each of the three lines says.",
+          "screenshotAfter": true,
+          "screenshotLabel": "notepad-readback"
+        }
+      ],
+      "verifications": [
+        { "type": "ProcessRunning", "target": "notepad", "description": "Notepad is running" },
+        { "type": "ResponseContains", "target": "Desktop Automation", "description": "Agent read back Line 1" },
+        { "type": "ResponseContains", "target": "Multi-Step Test", "description": "Agent read back Line 2" },
+        { "type": "ResponseContains", "target": "Verification Pass", "description": "Agent read back Line 3" }
+      ],
+      "cleanupProcesses": ["notepad"]
+    },
+    {
+      "id": "L2-03",
+      "name": "Calculator Division and Verification",
+      "description": "Computes 360 ÷ 12 = 30 and validates the agent reads the display correctly",
+      "difficulty": "Medium",
+      "steps": [
+        {
+          "prompt": "Open Calculator and compute 360 divided by 12. Read the exact result from the display.",
+          "screenshotAfter": true,
+          "screenshotLabel": "calc-division"
+        }
+      ],
+      "verifications": [
+        { "type": "ResponseContains", "target": "30", "description": "Agent reports 30" },
+        { "type": "ProcessRunning", "target": "CalculatorApp", "description": "Calculator still running" }
+      ],
+      "cleanupProcesses": ["CalculatorApp"]
+    },
+    {
+      "id": "L2-04",
+      "name": "Calc → Notepad Pipeline",
+      "description": "Computes 75 × 8 = 600 in Calculator, then transfers the result to Notepad",
+      "difficulty": "Complex",
+      "timeoutSeconds": 300,
+      "steps": [
+        {
+          "prompt": "Open Calculator and compute 75 times 8. Tell me the exact result.",
+          "screenshotAfter": true,
+          "screenshotLabel": "step1-calc-result",
+          "delayAfterMs": 1500,
+          "verifications": [
+            { "type": "ResponseContains", "target": "600", "description": "Calculator shows 600" }
+          ]
+        },
+        {
+          "prompt": "Now open Notepad and type 'Calculator Result: 600' on the first line. Keep both apps open.",
+          "screenshotAfter": true,
+          "screenshotLabel": "step2-notepad-written",
+          "delayAfterMs": 1500
+        },
+        {
+          "prompt": "Read what you typed in Notepad and confirm the text.",
+          "screenshotAfter": true,
+          "screenshotLabel": "step3-notepad-verify"
+        }
+      ],
+      "verifications": [
+        { "type": "ResponseContains", "target": "600", "description": "Agent reports 600 in final response" },
+        { "type": "ProcessRunning", "target": "CalculatorApp", "description": "Calculator still running" },
+        { "type": "ProcessRunning", "target": "notepad", "description": "Notepad still running" }
+      ],
+      "cleanupProcesses": ["CalculatorApp", "notepad"]
+    },
+    {
+      "id": "L2-05",
+      "name": "Notepad Save and Reopen",
+      "description": "Types text in Notepad, saves to Desktop, closes, reopens, and reads back",
+      "difficulty": "Complex",
+      "timeoutSeconds": 300,
+      "steps": [
+        {
+          "prompt": "Open Notepad and type the following text: 'IdolClick Level 2 Test — File saved and verified on Desktop.'",
+          "screenshotAfter": true,
+          "screenshotLabel": "step1-typed",
+          "delayAfterMs": 1500
+        },
+        {
+          "prompt": "Save this Notepad file to the Desktop as 'level2-test.txt' using File > Save As or Ctrl+Shift+S. Then close Notepad.",
+          "screenshotAfter": true,
+          "screenshotLabel": "step2-saved",
+          "delayAfterMs": 2000
+        },
+        {
+          "prompt": "Open Notepad again and open the file 'level2-test.txt' from the Desktop. Read the content and tell me exactly what it says.",
+          "screenshotAfter": true,
+          "screenshotLabel": "step3-reopened"
+        }
+      ],
+      "verifications": [
+        { "type": "ProcessRunning", "target": "notepad", "description": "Notepad is running" },
+        { "type": "ResponseContains", "target": "Level 2 Test", "description": "Agent read back the saved content" }
+      ],
+      "cleanupProcesses": ["notepad"]
+    }
+  ]
+}

@@ -10,7 +10,7 @@
 #define MyAppName "IdolClick"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "Jobi Joy"
-#define MyAppURL "https://github.com/jobijoy/tools"
+#define MyAppURL "https://github.com/jobijoy/IdolClick"
 #define MyAppExeName "IdolClick.exe"
 #define MyAppDescription "Rule-based Windows UI Automation Tool"
 #define MyAppCopyright "Copyright (C) 2024-2026 Jobi Joy"

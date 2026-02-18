@@ -49,6 +49,47 @@ public partial class SettingsWindow : Window
         VisionFallbackCheck.IsChecked = agent.VisionFallbackEnabled;
         VisionModelBox.Text = agent.VisionModelId;
         VisionConfidenceBox.Text = agent.VisionConfidenceThreshold.ToString("F1");
+        
+        // Voice input settings
+        VoiceEnabledCheck.IsChecked = agent.VoiceInputEnabled;
+        WhisperEndpointBox.Text = agent.WhisperEndpoint;
+        WhisperApiKeyBox.Password = agent.WhisperApiKey;
+        WhisperDeploymentBox.Text = agent.WhisperDeploymentId;
+        VoiceLanguageBox.Text = agent.VoiceLanguage;
+        UpdateVoiceConfigStatus(agent);
+    }
+
+    private void UpdateVoiceConfigStatus(Models.AgentSettings agent)
+    {
+        // Whisper-specific endpoint/key take priority; fall back to main agent settings
+        var effectiveEndpoint = !string.IsNullOrWhiteSpace(agent.WhisperEndpoint) ? agent.WhisperEndpoint : agent.Endpoint;
+        var effectiveKey = !string.IsNullOrWhiteSpace(agent.WhisperApiKey) ? agent.WhisperApiKey : agent.ApiKey;
+        var hasEndpoint = !string.IsNullOrWhiteSpace(effectiveEndpoint);
+        var hasKey = !string.IsNullOrWhiteSpace(effectiveKey);
+        var hasDeployment = !string.IsNullOrWhiteSpace(agent.WhisperDeploymentId);
+        var usingDedicated = !string.IsNullOrWhiteSpace(agent.WhisperEndpoint);
+
+        if (!agent.VoiceInputEnabled)
+        {
+            VoiceConfigStatus.Text = "ℹ Voice input is disabled. Enable the checkbox above to show the 🎤 mic button.";
+            VoiceConfigStatus.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+        }
+        else if (!hasEndpoint || !hasKey)
+        {
+            VoiceConfigStatus.Text = "⚠ Voice requires an endpoint and API key. Set either the Whisper-specific fields below, or the main Agent endpoint/key above.";
+            VoiceConfigStatus.Foreground = (System.Windows.Media.Brush)FindResource("WarningBrush");
+        }
+        else if (!hasDeployment)
+        {
+            VoiceConfigStatus.Text = "⚠ Enter a Whisper deployment ID (e.g., \"whisper\" or \"whisper-1\").";
+            VoiceConfigStatus.Foreground = (System.Windows.Media.Brush)FindResource("WarningBrush");
+        }
+        else
+        {
+            var source = usingDedicated ? "dedicated Whisper endpoint" : "main Agent endpoint";
+            VoiceConfigStatus.Text = $"✓ Voice input is configured and ready (using {source}). The 🎤 mic button will appear in Reason and Teach modes.";
+            VoiceConfigStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        }
     }
 
     private bool IsStartupEnabled()
@@ -123,6 +164,14 @@ public partial class SettingsWindow : Window
         agent.VisionModelId = VisionModelBox.Text.Trim();
         if (double.TryParse(VisionConfidenceBox.Text.Trim(), out var threshold) && threshold >= 0 && threshold <= 1)
             agent.VisionConfidenceThreshold = threshold;
+        
+        // Voice input settings
+        agent.VoiceInputEnabled = VoiceEnabledCheck.IsChecked == true;
+        agent.WhisperEndpoint = WhisperEndpointBox.Text.Trim();
+        agent.WhisperApiKey = WhisperApiKeyBox.Password;
+        var whisperDeploy = WhisperDeploymentBox.Text.Trim();
+        agent.WhisperDeploymentId = string.IsNullOrWhiteSpace(whisperDeploy) ? "whisper" : whisperDeploy;
+        agent.VoiceLanguage = VoiceLanguageBox.Text.Trim();
 
         App.Config.SaveConfig(cfg);
         App.Log.SetLevel(s.LogLevel);

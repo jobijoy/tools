@@ -61,6 +61,9 @@ internal static class Win32
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int X, int Y);
 
+    /// <summary>Move the mouse cursor to the specified screen coordinates (used by Hover action).</summary>
+    public static void MoveCursor(int x, int y) => SetCursorPos(x, y);
+
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out POINT lpPoint);
 
@@ -354,6 +357,81 @@ internal static class Win32
         public IntPtr ForegroundWindow;
         public int CursorX;
         public int CursorY;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // WINDOW ACTIVATION (single-instance bring-to-front)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    private const int SW_RESTORE = 9;
+    private const uint FLASHW_ALL = 3;   // Flash both caption and taskbar
+    private const uint FLASHW_TIMERNOFG = 12; // Flash until window comes to foreground
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FLASHWINFO
+    {
+        public uint cbSize;
+        public IntPtr hwnd;
+        public uint dwFlags;
+        public uint uCount;
+        public uint dwTimeout;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    /// <summary>
+    /// Aggressively brings a window to the foreground, working around
+    /// Windows restrictions that prevent background processes from stealing focus.
+    /// Uses AttachThreadInput trick + FlashWindowEx as fallback.
+    /// </summary>
+    public static void ForceActivateWindow(IntPtr hWnd)
+    {
+        if (hWnd == IntPtr.Zero) return;
+
+        // If minimized, restore first
+        if (IsIconic(hWnd))
+            ShowWindow(hWnd, SW_RESTORE);
+
+        // Try the AttachThreadInput trick to gain foreground rights
+        var foreground = GetForegroundWindow();
+        var currentThreadId = GetCurrentThreadId();
+        var fgThreadId = GetWindowThreadProcessId(foreground, out _);
+        var targetThreadId = GetWindowThreadProcessId(hWnd, out _);
+
+        bool attachedFg = false, attachedTarget = false;
+        try
+        {
+            if (currentThreadId != fgThreadId)
+                attachedFg = AttachThreadInput(currentThreadId, fgThreadId, true);
+            if (currentThreadId != targetThreadId)
+                attachedTarget = AttachThreadInput(currentThreadId, targetThreadId, true);
+
+            SetForegroundWindow(hWnd);
+            BringWindowToTop(hWnd);
+        }
+        finally
+        {
+            if (attachedFg)  AttachThreadInput(currentThreadId, fgThreadId, false);
+            if (attachedTarget) AttachThreadInput(currentThreadId, targetThreadId, false);
+        }
+
+        // If we still don't have foreground, flash the taskbar to attract attention
+        if (GetForegroundWindow() != hWnd)
+        {
+            var fi = new FLASHWINFO
+            {
+                cbSize = (uint)Marshal.SizeOf<FLASHWINFO>(),
+                hwnd = hWnd,
+                dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG,
+                uCount = 5,
+                dwTimeout = 0
+            };
+            FlashWindowEx(ref fi);
+        }
     }
 
     // Hotkey registration

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "testName": "Notepad Type and Save",
+  "description": "Opens Notepad, types text, verifies it appeared, then closes without saving. Demonstrates the type, assert_text, and send_keys actions.",
+  "targetApp": "notepad",
+  "stopOnFailure": true,
+  "timeoutSeconds": 60,
+  "targetLock": true,
+  "steps": [
+    {
+      "order": 1,
+      "action": "launch",
+      "processPath": "notepad.exe",
+      "description": "Open Notepad",
+      "timeoutMs": 5000,
+      "delayAfterMs": 1000
+    },
+    {
+      "order": 2,
+      "action": "click",
+      "selector": "Document#Text Editor",
+      "description": "Focus the text editor area",
+      "timeoutMs": 3000
+    },
+    {
+      "order": 3,
+      "action": "type",
+      "selector": "Document#Text Editor",
+      "text": "Hello from IdolClick!\nThis text was typed by an automation flow.",
+      "description": "Type sample text into the editor",
+      "delayAfterMs": 500
+    },
+    {
+      "order": 4,
+      "action": "assert_text",
+      "selector": "Document#Text Editor",
+      "contains": "Hello from IdolClick",
+      "description": "Verify the typed text appeared in the editor"
+    },
+    {
+      "order": 5,
+      "action": "send_keys",
+      "keys": "Ctrl+A",
+      "description": "Select all text",
+      "delayAfterMs": 200
+    },
+    {
+      "order": 6,
+      "action": "send_keys",
+      "keys": "Delete",
+      "description": "Delete all text",
+      "delayAfterMs": 200
+    },
+    {
+      "order": 7,
+      "action": "send_keys",
+      "keys": "Alt+F4",
+      "description": "Close Notepad"
+    }
+  ]
+}

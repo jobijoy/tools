@@ -1,25 +1,23 @@
 using IdolClick.Models;
 
-namespace IdolClick.Services.Infrastructure;
+namespace IdolClick.Services.Backend;
 
 // ═══════════════════════════════════════════════════════════════════════════════════
-// AUTOMATION BACKEND — Polymorphic interface for desktop + web automation.
+// AUTOMATION BACKEND — Polymorphic interface for desktop automation.
 //
-// Design principles (from Playwright .NET research):
+// Design principles:
 //   • Unify the pipeline (TestFlow → StepResult → ExecutionReport) across backends
-//   • Keep selectors typed per backend — do NOT cram UIA and CSS into one grammar
+//   • Keep selectors typed per backend — do NOT cram different grammars together
 //   • Each backend owns its actionability contract (what "ready to click" means)
-//   • Trace artifacts are first-class (Playwright trace.zip, UIA screenshots)
+//   • Trace artifacts are first-class (UIA screenshots, tree snapshots)
 //   • Optional inspection hooks for agent tool-calling
 //
 // Current backends:
 //   • DesktopBackend (desktop-uia) — Windows UI Automation + Win32
-//   • PlaywrightBackend (playwright) — Chromium/Firefox/WebKit via Playwright .NET
 //
 // Package strategy (future):
 //   • IdolClick.Core — TestFlow, validation, runner pipeline, this interface
-//   • IdolClick.DesktopBackend — UIA implementation (no Playwright dependency)
-//   • IdolClick.PlaywrightBackend — browser implementation (references Microsoft.Playwright)
+//   • IdolClick.DesktopBackend — UIA implementation
 // ═══════════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
@@ -29,7 +27,7 @@ namespace IdolClick.Services.Infrastructure;
 public interface IAutomationBackend : IAsyncDisposable
 {
     /// <summary>
-    /// Machine-readable backend identifier: "desktop-uia", "playwright".
+    /// Machine-readable backend identifier: "desktop-uia".
     /// </summary>
     string Name { get; }
 
@@ -102,9 +100,6 @@ public sealed class BackendCapabilities
     /// <summary>Whether this backend can produce trace artifacts.</summary>
     public bool SupportsTracing { get; init; }
 
-    /// <summary>Whether this backend can capture network traffic logs.</summary>
-    public bool SupportsNetworkLogs { get; init; }
-
     /// <summary>Whether this backend can take screenshots.</summary>
     public bool SupportsScreenshots { get; init; }
 
@@ -126,15 +121,6 @@ public class BackendInitOptions
     /// <summary>Whether to enable verbose logging from the backend.</summary>
     public bool Verbose { get; set; }
 
-    // ── Playwright-specific options ──────────────────────────────────────
-    /// <summary>Browser type: "chromium", "firefox", "webkit". Default: "chromium".</summary>
-    public string BrowserType { get; set; } = "chromium";
-
-    /// <summary>Whether to run browser in headless mode.</summary>
-    public bool Headless { get; set; }
-
-    /// <summary>Initial URL to navigate to after browser launch.</summary>
-    public string? StartUrl { get; set; }
 }
 
 /// <summary>
@@ -253,7 +239,7 @@ public class ArtifactOptions
     /// <summary>Capture DOM/UIA snapshots at each action.</summary>
     public bool Snapshots { get; set; } = true;
 
-    /// <summary>Include source code in traces (Playwright).</summary>
+    /// <summary>Include source code in traces.</summary>
     public bool Sources { get; set; }
 
     /// <summary>Trace title for identification.</summary>
@@ -287,7 +273,7 @@ public class BackendArtifact
 // ═══════════════════════════════════════════════════════════════════════════════════
 // ACTIONABILITY CONTRACT — Per-action pre-conditions that must be met.
 //
-// Inspired by Playwright's auto-wait:
+// Auto-wait pattern:
 //   • Click: exists + visible + stable + enabled + receives-events
 //   • Fill/Type: exists + visible + enabled + editable
 //   • Assert: exists (with retry)
@@ -371,6 +357,14 @@ public static class ActionabilityContracts
             // No-element actions: no checks
             StepAction.SendKeys or StepAction.Wait or StepAction.Navigate or
             StepAction.Screenshot or StepAction.Launch => new HashSet<ActionabilityCheck>(),
+
+            // Hover: element must exist, be visible and stable (like click minus enabled/receives-events)
+            StepAction.Hover => new HashSet<ActionabilityCheck>
+            {
+                ActionabilityCheck.Exists,
+                ActionabilityCheck.Visible,
+                ActionabilityCheck.Stable
+            },
 
             _ => new HashSet<ActionabilityCheck> { ActionabilityCheck.Exists }
         };

@@ -1,92 +1,125 @@
 # IdolClick
 
-> **AI-Compatible Deterministic UI Execution Runtime for Windows**
-
-Desktop UI automation with structured flows, safety guardrails, and AI agent integration. Rule-based or AI-driven — your choice.
-
-![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/v1.0.0-blue)
+> **Smart Windows desktop automation — rule engine, AI agent, and flow builder in one tool.**
 
 <p align="center">
-  <img src="src/IdolClick.App/Assets/idol-click.png" alt="IdolClick" width="150"/>
+  <img src="src/IdolClick.App/Assets/idol-click.png" alt="IdolClick" width="120"/>
 </p>
 
-## What It Does
+![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4) ![WPF-UI](https://img.shields.io/badge/WPF--UI-Fluent%20Design-0078D4) ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/v1.0.0-blue)
 
-| Mode | Description |
-|------|-------------|
-| **Classic** | Rule-based polling — auto-click, send keys, run scripts when UI elements match |
-| **Agent** | LLM chat with 9 tools — AI authors structured flows, executes them, reads reports, patches + retries |
+---
 
-**For the full product narrative, architecture, and DSL specification, see [PRODUCT.md](PRODUCT.md).**
+## What Is IdolClick?
 
-## Features
+IdolClick automates Windows desktop applications through three modes:
 
-| Feature | Description |
-|---------|-------------|
-| Structured Flows | JSON DSL with 13 actions, typed selectors, post-step assertions |
-| AI Agent Integration | Microsoft.Extensions.AI with function-calling (9 tools) |
-| Vision Fallback | Screenshot + LLM vision when UIA selectors fail (flagged as Warning) |
-| Safety Hardening | Kill switch, target lock, process allowlist, audit log |
-| Actionability Checks | Playwright-inspired pre-action validation (visible, enabled, stable) |
-| Execution Reports | Machine-readable JSON with timing, element snapshots, backend call log |
-| Rule Engine | Match UI elements by app, text, regex, region, element type |
-| Scripting | PowerShell & C# (Roslyn) with context variables |
-| Plugins | Extend with .NET DLLs or PowerShell scripts |
+| Mode | Icon | What It Does |
+|------|------|--------------|
+| **Instinct** | ⚡ | Rule-based engine — auto-click buttons, send keys, run scripts when UI elements match |
+| **Reason** | 🧠 | AI agent chat — describe what you want in plain English, the agent plans and executes |
+| **Teach** | 🎓 | Smart Sentence Builder — build reusable automation flows step by step |
+
+It works by reading the **Windows UI Automation tree** (the same accessibility layer screen readers use) to find, verify, and interact with controls in any desktop application.
+
+### What IdolClick Is NOT
+
+- **Not a browser automation tool** — use Playwright, Puppeteer, or Selenium for web testing
+- **Not a screen-coordinate macro** — actions target semantic UI elements, not pixel positions
+- **Not a general-purpose RPA platform** — purpose-built for desktop automation on Windows
+- **Not cross-platform** — requires Windows 10/11 and the UIAutomation API
+
+---
 
 ## Quick Start
 
 ```powershell
-git clone https://github.com/jobijoy/tools.git
-cd tools/AutomationTool
+git clone https://github.com/jobijoy/IdolClick.git
+cd IdolClick
 .\Start-IdolClick.ps1
 ```
 
 **Requirements:** Windows 10/11, [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 
-## Usage
+### First Launch
 
-1. Launch app (runs in system tray)
-2. Click tray icon → **Show Panel**
-3. Choose mode: **Classic** (rules) or **Agent** (AI chat)
-4. Toggle automation with **Ctrl+Alt+T** or tray menu
-5. Emergency stop: **Ctrl+Alt+Escape** (kill switch)
+1. Choose a mode (Instinct, Reason, or Teach) on the home screen
+2. **Instinct mode** — add rules that match UI elements and trigger actions
+3. **Reason mode** — type a request like *"Click the Allow button in VS Code every 5 seconds"*
+4. **Teach mode** — describe a workflow and refine the generated steps
+5. Toggle automation with **Ctrl+Alt+T** or the play button
+6. Emergency stop: **Ctrl+Alt+Escape** (kill switch)
+
+---
+
+## Architecture
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                    Brain (LLM via IChatClient)             │
+│      Plan → Compile → Execute → Report → Fix → Retry      │
+└──────────┬────────────────────────────────┬────────────────┘
+           │                                │
+     PackOrchestrator                  AgentTools (14 tools)
+           │                                │
+     ┌─────┴──────┐                   StepExecutor
+     │ Plan       │                        │
+     │ Compile    │                 IAutomationBackend
+     │ Run        │                        │
+     │ Report     │                  DesktopBackend
+     └────────────┘                  (UIA + Win32)
+```
+
+| Layer | Purpose |
+|-------|---------|
+| **Brain** | LLM (GPT-4o, Claude, or any OpenAI-compatible model) reasons, plans, decides |
+| **Eye** | UI Automation tree + optional screenshot capture with LLM vision |
+| **Hand** | Deterministic UIA actions — click, type, send keys, assert, wait |
+
+---
+
+## Modules
+
+| Module | Status | Description |
+|--------|--------|-------------|
+| **Classic** | Stable | Rule-based polling engine — auto-click, send keys, run scripts |
+| **Agent** | Stable | LLM chat with 14 tool-calling functions |
+| **Pack** | Stable | Orchestrated testing pipeline with confidence scoring |
+| **Commands** | Alpha | Natural language → structured flow compiler |
+| **API** | Alpha | Embedded Kestrel REST + SignalR for external integration |
+| **MCP** | Alpha | Model Context Protocol server for AI agent interop |
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Structured Flows** | JSON DSL with 13 actions, typed selectors, post-step assertions |
+| **AI Agent (14 tools)** | Microsoft.Extensions.AI with function-calling |
+| **Pack Pipeline** | Plan → Compile → Validate → Execute → Report |
+| **Dual-Perception Eye** | Structural (UIA tree) + Visual (screenshot) |
+| **Confidence Scoring** | 0.0–1.0 weighted quality signal after execution |
+| **Safety Hardening** | Kill switch, target lock, process allowlist, audit log |
+| **Execution Dashboard** | Live step-by-step progress with pass/fail indicators |
+| **Execution Reports** | Machine-readable JSON with timing and element snapshots |
+| **Scripting** | PowerShell & C# (Roslyn) with context variables |
+| **Plugins** | Extend with .NET DLLs or PowerShell scripts |
+
+---
 
 ## Safety
 
 | Guardrail | Description |
 |-----------|-------------|
-| **Kill Switch** | `Ctrl+Alt+Escape` — instantly stops everything, requires manual reset |
-| **Target Lock** | Pin to specific window (HWND + PID); fail if focus shifts |
-| **Process Allowlist** | Only automate listed processes (wildcards supported) |
+| **Kill Switch** | `Ctrl+Alt+Escape` — instantly stops everything |
+| **Target Lock** | Pin execution to a specific window (HWND + PID) |
+| **Process Allowlist** | Only automate listed processes |
 | **Vision Warnings** | Vision-resolved steps are flagged, never silently promoted |
 | **Audit Log** | All safety events written to `logs/audit_log.txt` |
-| **Per-Rule Limits** | Cooldowns, time windows, max executions, dry-run, confirmations |
+| **Per-Rule Limits** | Cooldowns, time windows, max executions, dry-run mode |
 
-## 🔥 Hotkey Launching (Ctrl+Alt+T)
-
-You can start or toggle IdolClick using the same hotkey:
-
-### When App is Running
-- Press **Ctrl+Alt+T** to show/hide the control panel
-- Works globally from any application
-
-### When App is Not Running
-Create a Windows shortcut with the hotkey:
-
-1. Right-click `IdolClick.exe` → **Create shortcut**
-2. Move shortcut to Desktop or Start Menu folder
-3. Right-click shortcut → **Properties**
-4. Click in **Shortcut key** field → Press **Ctrl+Alt+T**
-5. Click **OK**
-
-Now **Ctrl+Alt+T** launches the app if closed, or toggles the window if running!
-
-### Pro Tip: Auto-Start
-Enable **"Start with Windows"** in Settings so IdolClick is always running in tray.
+---
 
 ## Config Example
-
-`config.json` in app directory:
 
 ```json
 {
@@ -106,6 +139,8 @@ Enable **"Start with Windows"** in Settings so IdolClick is always running in tr
 }
 ```
 
+See [`examples/`](examples/) for ready-to-use flow files.
+
 ## Actions
 
 | Action | Description |
@@ -116,23 +151,7 @@ Enable **"Start with Windows"** in Settings so IdolClick is always running in tr
 | `ShowNotification` | Display notification |
 | `Plugin` | Run custom plugin |
 
-## Scripting
-
-**PowerShell** — Variables: `$RuleName`, `$MatchedText`, `$WindowTitle`, `$ProcessName`, `$TriggerTime`
-
-```powershell
-Write-Output "Matched: $MatchedText in $WindowTitle"
-```
-
-**C# (Roslyn)** — Access via `Context` object
-
-```csharp
-Log($"Rule {Context.Rule.Name} triggered");
-```
-
-## Plugins
-
-Drop `.ps1` or `.dll` files in `Plugins/` folder. See [Plugins/README.md](src/IdolClick.App/Plugins/README.md).
+---
 
 ## Build
 
@@ -142,17 +161,32 @@ dotnet build IdolClick.sln -c Release
 
 Output: `src/IdolClick.App/bin/Release/net8.0-windows/IdolClick.exe`
 
-### Publish (Self-contained)
+### Publish
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained false
 ```
 
-## Security & Safety
+---
 
-> 🔐 **All UI actions are performed locally.** No data is sent externally unless you configure an LLM endpoint for Agent mode. Rules only interact with windows you target. Configuration is stored locally in `config.json`.
+## Documentation
 
-> 🛡️ **Safety-first design.** Kill switch, target lock, process allowlist, and audit logging are built-in. See [PRODUCT.md](PRODUCT.md) for the full safety model.
+| Document | Audience | Description |
+|----------|----------|-------------|
+| [PRODUCT.md](PRODUCT.md) | Everyone | Full product narrative, DSL spec, safety model |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Architects | Layer architecture, data flow, components |
+| [AGENTS-GUIDE.md](AGENTS-GUIDE.md) | Coding agents | Conventions, common tasks, file map |
+| [CHANGELOG.md](CHANGELOG.md) | Everyone | Version history and release notes |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributors | How to contribute, code style, PR process |
+| [SECURITY.md](SECURITY.md) | Security researchers | Vulnerability reporting |
+
+## Roadmap
+
+- **v1.0.0** ✅ Classic mode, Agent mode, Pack Pipeline, Desktop UIA backend, safety hardening
+- **v1.1** — MCP cross-validation (Figma, backend APIs)
+- **v1.2** — Live Execution Dashboard, Confidence Engine v2
+- **v1.3** — Advanced UIA selectors, CLI runner, multi-monitor
+- **v1.4** — Multi-agent orchestration, distributed execution
 
 ## License
 

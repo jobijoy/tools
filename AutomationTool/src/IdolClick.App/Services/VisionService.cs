@@ -112,23 +112,28 @@ public class VisionService
             var credential = new System.ClientModel.ApiKeyCredential(settings.ApiKey);
             OpenAI.Chat.ChatClient chatClient;
 
+            // Extract base URL — users often paste the full deployment/chat-completions URL
+            var endpointUrl = settings.Endpoint.TrimEnd('/');
+            if (Uri.TryCreate(endpointUrl, UriKind.Absolute, out var parsedUri))
+                endpointUrl = $"{parsedUri.Scheme}://{parsedUri.Host}";
+
             if (IsAzureOpenAIEndpoint(settings.Endpoint))
             {
                 var azureClient = new Azure.AI.OpenAI.AzureOpenAIClient(
-                    new Uri(settings.Endpoint), credential);
+                    new Uri(endpointUrl), credential);
                 chatClient = azureClient.GetChatClient(modelId);
             }
             else
             {
                 var openAiClient = new OpenAI.OpenAIClient(credential, new OpenAI.OpenAIClientOptions
                 {
-                    Endpoint = new Uri(settings.Endpoint)
+                    Endpoint = new Uri(endpointUrl)
                 });
                 chatClient = openAiClient.GetChatClient(modelId);
             }
 
             _visionClient = chatClient.AsIChatClient();
-            _log.Info("Vision", $"Vision service configured: {modelId}");
+            _log.Info("Vision", $"Vision service configured: {modelId} → {endpointUrl}");
         }
         catch (Exception ex)
         {
@@ -177,7 +182,7 @@ public class VisionService
             }
 
             // 2. Load image and encode as base64
-            var imageBytes = await File.ReadAllBytesAsync(screenshotPath, ct);
+            var imageBytes = await File.ReadAllBytesAsync(screenshotPath, ct).ConfigureAwait(false);
             var base64 = Convert.ToBase64String(imageBytes);
 
             // Get image dimensions for coordinate mapping
@@ -207,7 +212,7 @@ public class VisionService
                 // Temperature omitted — some models (e.g. o-series, gpt-5.2) reject custom values
             };
 
-            var response = await _visionClient.GetResponseAsync(messages, options, ct);
+            var response = await _visionClient.GetResponseAsync(messages, options, ct).ConfigureAwait(false);
             var responseText = response.Text ?? "";
 
             _log.Debug("Vision", $"Vision response: {responseText}");
