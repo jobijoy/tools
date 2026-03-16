@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "testName": "YouTube Video Monitor Bootstrap",
+  "description": "Open Edge to a YouTube watch URL, focus the page, and toggle playback so the capture pack can observe it over time.",
+  "targetApp": "msedge",
+  "stopOnFailure": true,
+  "timeoutSeconds": 60,
+  "steps": [
+    {
+      "order": 1,
+      "action": "navigate",
+      "app": "msedge",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "description": "Open a YouTube video in Edge",
+      "timeoutMs": 15000,
+      "delayAfterMs": 3000
+    },
+    {
+      "order": 2,
+      "action": "send_keys",
+      "app": "msedge",
+      "keys": "Tab, Tab, Enter",
+      "description": "Dismiss first-run or consent prompts if present",
+      "delayAfterMs": 1000
+    },
+    {
+      "order": 3,
+      "action": "send_keys",
+      "app": "msedge",
+      "keys": "k",
+      "description": "Toggle playback",
+      "delayAfterMs": 1000
+    }
+  ]
+}

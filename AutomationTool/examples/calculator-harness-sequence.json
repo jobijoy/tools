@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "testName": "Calculator Harness Sequence",
+  "description": "Bootstrap and checkpoint flow for the reusable Calculator capture pack. Opens Calculator, runs a few deterministic results, and leaves the app ready for repeated observation.",
+  "targetApp": "CalculatorApp",
+  "stopOnFailure": true,
+  "timeoutSeconds": 90,
+  "steps": [
+    {
+      "order": 1,
+      "action": "launch",
+      "processPath": "calc.exe",
+      "description": "Open Calculator",
+      "timeoutMs": 5000,
+      "delayAfterMs": 1500
+    },
+    {
+      "order": 2,
+      "action": "send_keys",
+      "keys": "Escape",
+      "description": "Clear the display",
+      "delayAfterMs": 300
+    },
+    {
+      "order": 3,
+      "action": "click",
+      "selector": "Button#num2Button",
+      "description": "Press 2",
+      "delayAfterMs": 150
+    },
+    {
+      "order": 4,
+      "action": "click",
+      "selector": "Button#plusButton",
+      "description": "Press +",
+      "delayAfterMs": 150
+    },
+    {
+      "order": 5,
+      "action": "click",
+      "selector": "Button#num5Button",
+      "description": "Press 5",
+      "delayAfterMs": 150
+    },
+    {
+      "order": 6,
+      "action": "click",
+      "selector": "Button#equalButton",
+      "description": "Press =",
+      "delayAfterMs": 300
+    },
+    {
+      "order": 7,
+      "action": "assert_text",
+      "selector": "Text#CalculatorResults",
+      "contains": "7",
+      "description": "Verify 2 + 5 = 7",
+      "timeoutMs": 3000
+    }
+  ]
+}

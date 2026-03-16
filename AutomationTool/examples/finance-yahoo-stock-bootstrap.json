@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "testName": "Finance Yahoo Stock Monitor Bootstrap",
+  "description": "Open Edge to the Yahoo Finance quote page for {{symbol}} and leave the quote page visible for repeated monitoring captures.",
+  "targetApp": "msedge",
+  "stopOnFailure": true,
+  "timeoutSeconds": 75,
+  "steps": [
+    {
+      "order": 1,
+      "action": "navigate",
+      "app": "msedge",
+      "url": "https://finance.yahoo.com/quote/{{symbol}}",
+      "description": "Open the Yahoo Finance quote page for {{symbol}} in Edge",
+      "timeoutMs": 15000,
+      "delayAfterMs": 4000
+    },
+    {
+      "order": 2,
+      "action": "send_keys",
+      "app": "msedge",
+      "keys": "Tab, Tab, Enter",
+      "description": "Dismiss consent or first-run prompts if they appear",
+      "delayAfterMs": 1000
+    },
+    {
+      "order": 3,
+      "action": "focus_window",
+      "app": "msedge",
+      "windowTitle": "{{symbol}}",
+      "description": "Focus the Yahoo Finance quote window",
+      "timeoutMs": 10000,
+      "delayAfterMs": 1000
+    }
+  ]
+}

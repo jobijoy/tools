@@ -10,7 +10,9 @@ public enum AppMode
     /// <summary>Reason — AI agent mode with natural language interaction (deliberate thinking).</summary>
     Agent,
     /// <summary>Teach — Smart Sentence Builder for creating reusable automations (learning).</summary>
-    Teach
+    Teach,
+    /// <summary>Capture — reusable visual snapshots for windows and regions.</summary>
+    Capture
 }
 
 /// <summary>
@@ -27,9 +29,16 @@ public class AppConfig
     /// Global application settings affecting all rules and behaviors.
     /// </summary>
     public GlobalSettings Settings { get; set; } = new();
+
+    /// <summary>
+    /// Top-level AI and Foundry-facing configuration.
+    /// This is the canonical location for endpoint, model, and voice settings.
+    /// </summary>
+    public AppAiSettings Ai { get; set; } = new();
     
     /// <summary>
     /// AI agent configuration for LLM-backed automation.
+    /// Retained as a compatibility mirror for runtime code and older config files.
     /// </summary>
     public AgentSettings AgentSettings { get; set; } = new();
     
@@ -43,6 +52,88 @@ public class AppConfig
     /// Externalizes magic numbers so they can be tuned without recompilation.
     /// </summary>
     public TimingSettings Timing { get; set; } = new();
+
+    /// <summary>
+    /// Generic capture utility settings and saved profiles.
+    /// </summary>
+    public CaptureWorkspaceSettings Capture { get; set; } = new();
+
+    /// <summary>
+    /// Rolling review buffer settings for Week 1 recording.
+    /// </summary>
+    public ReviewBufferSettings Review { get; set; } = new();
+}
+
+/// <summary>
+/// Top-level AI configuration used across the application.
+/// This mirrors the runtime agent settings so the public config shape can stay app-centric.
+/// </summary>
+public class AppAiSettings
+{
+    public string Endpoint { get; set; } = "";
+    public string ModelId { get; set; } = "gpt-4o";
+    public string ApiKey { get; set; } = "";
+    public int MaxTokens { get; set; } = 4096;
+    public double Temperature { get; set; }
+    public bool VisionFallbackEnabled { get; set; }
+    public double VisionConfidenceThreshold { get; set; } = 0.7;
+    public string VisionModelId { get; set; } = "";
+    public bool VoiceInputEnabled { get; set; } = true;
+    public string WhisperDeploymentId { get; set; } = "whisper";
+    public string WhisperEndpoint { get; set; } = "";
+    public string WhisperApiKey { get; set; } = "";
+    public string VoiceLanguage { get; set; } = "";
+
+    public bool HasExplicitValues()
+    {
+        return !string.IsNullOrWhiteSpace(Endpoint)
+            || !string.Equals(ModelId, "gpt-4o", StringComparison.Ordinal)
+            || !string.IsNullOrWhiteSpace(ApiKey)
+            || MaxTokens != 4096
+            || Temperature != 0
+            || VisionFallbackEnabled
+            || Math.Abs(VisionConfidenceThreshold - 0.7) > 0.0001
+            || !string.IsNullOrWhiteSpace(VisionModelId)
+            || VoiceInputEnabled != true
+            || !string.Equals(WhisperDeploymentId, "whisper", StringComparison.Ordinal)
+            || !string.IsNullOrWhiteSpace(WhisperEndpoint)
+            || !string.IsNullOrWhiteSpace(WhisperApiKey)
+            || !string.IsNullOrWhiteSpace(VoiceLanguage);
+    }
+
+    public void CopyFrom(AgentSettings agent)
+    {
+        Endpoint = agent.Endpoint;
+        ModelId = agent.ModelId;
+        ApiKey = agent.ApiKey;
+        MaxTokens = agent.MaxTokens;
+        Temperature = agent.Temperature;
+        VisionFallbackEnabled = agent.VisionFallbackEnabled;
+        VisionConfidenceThreshold = agent.VisionConfidenceThreshold;
+        VisionModelId = agent.VisionModelId;
+        VoiceInputEnabled = agent.VoiceInputEnabled;
+        WhisperDeploymentId = agent.WhisperDeploymentId;
+        WhisperEndpoint = agent.WhisperEndpoint;
+        WhisperApiKey = agent.WhisperApiKey;
+        VoiceLanguage = agent.VoiceLanguage;
+    }
+
+    public void CopyTo(AgentSettings agent)
+    {
+        agent.Endpoint = Endpoint;
+        agent.ModelId = ModelId;
+        agent.ApiKey = ApiKey;
+        agent.MaxTokens = MaxTokens;
+        agent.Temperature = Temperature;
+        agent.VisionFallbackEnabled = VisionFallbackEnabled;
+        agent.VisionConfidenceThreshold = VisionConfidenceThreshold;
+        agent.VisionModelId = VisionModelId;
+        agent.VoiceInputEnabled = VoiceInputEnabled;
+        agent.WhisperDeploymentId = WhisperDeploymentId;
+        agent.WhisperEndpoint = WhisperEndpoint;
+        agent.WhisperApiKey = WhisperApiKey;
+        agent.VoiceLanguage = VoiceLanguage;
+    }
 }
 
 /// <summary>
@@ -58,8 +149,9 @@ public class GlobalSettings
     public AppMode Mode { get; set; } = AppMode.Classic;
 
     /// <summary>
-    /// When true, the Home screen is skipped and the app launches directly into
-    /// the saved <see cref="Mode"/>. Set by the Home screen's "Remember my choice" checkbox.
+    /// Legacy startup flag retained for config compatibility.
+    /// The welcome launcher is now shown by default so the app can present its
+    /// utility families before loading a specific workspace.
     /// </summary>
     public bool SkipHomeScreen { get; set; }
     
@@ -281,6 +373,259 @@ public class AgentSettings
     /// Empty or null = auto-detect language.
     /// </summary>
     public string VoiceLanguage { get; set; } = "";
+}
+
+/// <summary>
+/// Persisted settings for the capture workspace.
+/// </summary>
+public class CaptureWorkspaceSettings
+{
+    /// <summary>
+    /// Default directory for saved capture artifacts. Empty = app-managed default.
+    /// </summary>
+    public string DefaultOutputDirectory { get; set; } = "";
+
+    /// <summary>
+    /// Global hotkey used to trigger the selected capture profile.
+    /// </summary>
+    public string Hotkey { get; set; } = "Ctrl+Alt+S";
+
+    /// <summary>
+    /// Enables the global capture hotkey when a main window is active.
+    /// </summary>
+    public bool HotkeyEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Push-to-talk hotkey used for voice annotations.
+    /// Hold the hotkey to record and release to transcribe.
+    /// </summary>
+    public string AnnotationHotkey { get; set; } = "Ctrl+Alt+V";
+
+    /// <summary>
+    /// Enables the annotation push-to-talk hotkey.
+    /// </summary>
+    public bool AnnotationHotkeyEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Preferred orb placement preset. Supports BottomRight, BottomLeft, TopRight, TopLeft, and Custom.
+    /// </summary>
+    public string OrbPlacement { get; set; } = "BottomRight";
+
+    /// <summary>
+    /// When true, a dragged custom orb location is remembered across launches.
+    /// </summary>
+    public bool RememberOrbLocation { get; set; } = true;
+
+    /// <summary>
+    /// Saved orb left coordinate for custom placement.
+    /// </summary>
+    public double? OrbLeft { get; set; }
+
+    /// <summary>
+    /// Saved orb top coordinate for custom placement.
+    /// </summary>
+    public double? OrbTop { get; set; }
+
+    /// <summary>
+    /// Enables repeated automatic capture from the floating orb.
+    /// </summary>
+    public bool OrbIntervalCaptureEnabled { get; set; }
+
+    /// <summary>
+    /// Number of seconds between repeated orb-triggered captures.
+    /// </summary>
+    public int OrbIntervalSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Saved capture profiles shown in the capture workspace.
+    /// </summary>
+    public List<CaptureProfile> Profiles { get; set; } = [];
+
+    /// <summary>
+    /// Currently selected capture profile used by shared triggers.
+    /// </summary>
+    public string SelectedProfileId { get; set; } = "";
+
+    /// <summary>
+    /// Recent prompt-driven capture pack runs shared by Capture and Reason surfaces.
+    /// </summary>
+    public List<PromptPackHistoryEntry> PromptPackHistory { get; set; } = [];
+
+    /// <summary>
+    /// Maximum number of prompt-driven capture pack history entries to retain.
+    /// </summary>
+    public int MaxPromptPackHistoryEntries { get; set; } = 8;
+
+    /// <summary>
+    /// Number of recent capture events cached in memory for UI and API reads.
+    /// </summary>
+    public int MaxRecentEventsInMemory { get; set; } = 120;
+
+    /// <summary>
+    /// Maximum number of retained capture events on disk before pruning oldest entries.
+    /// </summary>
+    public int MaxSavedEvents { get; set; } = 250;
+
+    /// <summary>
+    /// Maximum number of retained journal entries in the JSONL journal.
+    /// </summary>
+    public int MaxJournalEntries { get; set; } = 250;
+
+    /// <summary>
+    /// Enables periodic retention maintenance for capture artifacts and journal entries.
+    /// </summary>
+    public bool RetentionEnabled { get; set; } = true;
+
+    /// <summary>
+    /// When true, capture journals are exported to the configured file adapter output directory.
+    /// </summary>
+    public bool SyncFileExportEnabled { get; set; }
+
+    /// <summary>
+    /// Output directory for file-based journal export and sync envelopes.
+    /// Empty = app-managed default.
+    /// </summary>
+    public string SyncExportDirectory { get; set; } = "";
+
+    /// <summary>
+    /// When true, capture journals are posted to the configured webhook endpoint.
+    /// </summary>
+    public bool SyncWebhookEnabled { get; set; }
+
+    /// <summary>
+    /// Destination webhook used to forward capture and annotation envelopes to an external backend.
+    /// </summary>
+    public string SyncWebhookUrl { get; set; } = "";
+
+    /// <summary>
+    /// Optional bearer token used by the capture sync webhook adapter.
+    /// </summary>
+    public string SyncWebhookApiKey { get; set; } = "";
+}
+
+public class PromptPackHistoryEntry
+{
+    public string Prompt { get; set; } = "";
+    public string PackId { get; set; } = "";
+    public string PackName { get; set; } = "";
+    public string ReportPath { get; set; } = "";
+    public bool Succeeded { get; set; }
+    public bool SmokeMode { get; set; } = true;
+    public DateTime LastRunUtc { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Settings for the low-impact rolling review buffer.
+/// </summary>
+public class ReviewBufferSettings
+{
+    /// <summary>
+    /// Enables background review buffering.
+    /// </summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Interval between captured review frames.
+    /// </summary>
+    public int FrameIntervalMs { get; set; } = 1500;
+
+    /// <summary>
+    /// Number of minutes to retain in the rolling buffer.
+    /// </summary>
+    public int BufferDurationMinutes { get; set; } = 3;
+
+    /// <summary>
+    /// Output folder for saved review bundles. Empty = app-managed default.
+    /// </summary>
+    public string OutputDirectory { get; set; } = "";
+
+    /// <summary>
+    /// Hotkey that saves the last N minutes of buffered review artifacts.
+    /// </summary>
+    public string SaveBufferHotkey { get; set; } = "Ctrl+Alt+R";
+
+    /// <summary>
+    /// Enables microphone chunk recording alongside the screen buffer.
+    /// </summary>
+    public bool MicEnabled { get; set; }
+
+    /// <summary>
+    /// Duration of each microphone chunk used in the rolling buffer.
+    /// </summary>
+    public int AudioChunkSeconds { get; set; } = 10;
+}
+
+/// <summary>
+/// Reusable capture definition that can contain one or many targets.
+/// </summary>
+public class CaptureProfile
+{
+    /// <summary>Stable profile id for UI selection and artifact metadata.</summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>Human-friendly profile name.</summary>
+    public string Name { get; set; } = "New Capture";
+
+    /// <summary>Whether the profile can be triggered.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>File prefix used for generated artifact names.</summary>
+    public string FilePrefix { get; set; } = "snap";
+
+    /// <summary>
+    /// Optional output directory override. Empty = workspace default.
+    /// </summary>
+    public string OutputDirectory { get; set; } = "";
+
+    /// <summary>
+    /// One or many targets captured as part of the same snap event.
+    /// </summary>
+    public List<CaptureTargetDefinition> Targets { get; set; } = [];
+}
+
+/// <summary>
+/// Supported capture target types.
+/// </summary>
+public enum CaptureTargetKind
+{
+    /// <summary>Normalized region of the full desktop.</summary>
+    ScreenRegion,
+    /// <summary>Entire window resolved from saved process/title hints.</summary>
+    Window,
+    /// <summary>Normalized region inside a resolved window.</summary>
+    WindowRegion
+}
+
+/// <summary>
+/// One capture target inside a reusable profile.
+/// </summary>
+public class CaptureTargetDefinition
+{
+    /// <summary>Stable target id inside the profile.</summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>Display name shown in the workspace.</summary>
+    public string Name { get; set; } = "Target";
+
+    /// <summary>What kind of capture this target performs.</summary>
+    public CaptureTargetKind Kind { get; set; } = CaptureTargetKind.ScreenRegion;
+
+    /// <summary>Process hint used for window resolution.</summary>
+    public string ProcessName { get; set; } = "";
+
+    /// <summary>Window title hint used for window resolution.</summary>
+    public string WindowTitle { get; set; } = "";
+
+    /// <summary>
+    /// Best-effort native handle hint from the last time the window was seen.
+    /// </summary>
+    public long WindowHandleHint { get; set; }
+
+    /// <summary>
+    /// Normalized region payload. For ScreenRegion this is relative to the virtual screen.
+    /// For WindowRegion this is relative to the resolved window bounds.
+    /// </summary>
+    public ScreenRegion? Region { get; set; }
 }
 
 /// <summary>

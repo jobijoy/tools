@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "testName": "Teams Conversation Monitor Bootstrap",
+  "description": "Template flow that opens Teams and leaves it on the current conversation for repeated capture. Adjust selectors and process path for your Teams installation.",
+  "targetApp": "ms-teams",
+  "stopOnFailure": true,
+  "timeoutSeconds": 60,
+  "steps": [
+    {
+      "order": 1,
+      "action": "launch",
+      "processPath": "ms-teams.exe",
+      "description": "Launch Microsoft Teams",
+      "timeoutMs": 8000,
+      "delayAfterMs": 4000
+    },
+    {
+      "order": 2,
+      "action": "focus_window",
+      "app": "ms-teams",
+      "windowTitle": "Microsoft Teams",
+      "description": "Focus the Teams window",
+      "timeoutMs": 8000,
+      "delayAfterMs": 1000
+    }
+  ]
+}

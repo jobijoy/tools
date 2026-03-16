@@ -55,21 +55,29 @@ The Brain proposes **what** to test. The Eye observes **what is**. The Hand does
 
 ## 2. System Overview
 
-### Dual-Mode Architecture
+### Three UX Modes, Two Execution Families
 
-IdolClick operates in two independent modes simultaneously:
+IdolClick presents three user-facing modes, backed by two execution families:
+
+- **Instinct / Classic** — the rule engine path
+- **Reason / Agent** — natural-language interaction over the agent + flow runtime
+- **Teach** — guided flow authoring over the same agent-era flow runtime
+
+Architecturally, Teach is not a third execution engine. It is a specialized authoring surface layered on the Agent/Flow stack.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
 │                         IdolClick Runtime                             │
 │                                                                       │
 │  ┌─────────────────────┐         ┌──────────────────────────────────┐│
-│  │   CLASSIC MODE       │         │         AGENT MODE               ││
+│  │   INSTINCT / CLASSIC │         │     REASON + TEACH STACK         ││
 │  │                      │         │                                  ││
 │  │  Rules (config.json) │         │  Brain (LLM via IChatClient)     ││
 │  │       ↓              │         │       ↓                          ││
 │  │  AutomationEngine    │         │  AgentService (tool-calling)     ││
 │  │   (poll + match)     │         │       ↓                          ││
+│  │                      │         │  TeachPanel / AgentChat UI       ││
+│  │                      │         │       ↓                          ││
 │  │       ↓              │         │  ┌─────────┐  ┌───────────────┐ ││
 │  │  ActionExecutor      │         │  │ Classic  │  │ Pack Pipeline │ ││
 │  │   (click, keys,      │         │  │ Tools(9) │  │ Tools (5)     │ ││

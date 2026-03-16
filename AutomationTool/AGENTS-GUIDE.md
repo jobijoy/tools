@@ -1,7 +1,7 @@
 # IdolClick — Coding Agent Guide
 
 > **Practical reference for AI coding agents and developers working on this codebase.**  
-> Read ARCHITECTURE.md first for the "what" — this document covers the "how."
+> Read `CURRENT-STATE.md` first for validated status, then `ARCHITECTURE.md` for the "what". This document covers the "how."
 
 ---
 
@@ -21,6 +21,13 @@
 ## 1. Quick Start
 
 ### Orientation
+
+Recommended read order for coding agents:
+
+1. `CURRENT-STATE.md` — validated status and mode maturity
+2. `DOCS-INDEX.md` — document ownership and read paths
+3. `ARCHITECTURE.md` — system shape and component boundaries
+4. `AGENTS-GUIDE.md` — coding conventions and task workflows
 
 ```
 AutomationTool/

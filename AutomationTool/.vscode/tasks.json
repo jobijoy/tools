@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build IdolClick Release",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"IdolClick.sln",
+				"-c",
+				"Release"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run IdolClick",
+			"type": "shell",
+			"dependsOn": "Build IdolClick Release",
+			"command": ".\\src\\IdolClick.App\\bin\\Release\\net8.0-windows\\IdolClick.exe",
+			"windows": {
+				"command": ".\\src\\IdolClick.App\\bin\\Release\\net8.0-windows\\IdolClick.exe"
+			},
+			"problemMatcher": [],
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}

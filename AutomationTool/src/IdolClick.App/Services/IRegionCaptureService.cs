@@ -44,12 +44,12 @@ public class CapturedRegion
     /// <summary>
     /// Convert to normalized region using screen bounds.
     /// </summary>
-    public Models.ScreenRegion ToScreenNormalized(int screenWidth, int screenHeight)
+    public Models.ScreenRegion ToScreenNormalized(int screenWidth, int screenHeight, int screenLeft = 0, int screenTop = 0)
     {
         return new Models.ScreenRegion
         {
-            X = (double)X / screenWidth,
-            Y = (double)Y / screenHeight,
+            X = (double)(X - screenLeft) / screenWidth,
+            Y = (double)(Y - screenTop) / screenHeight,
             Width = (double)Width / screenWidth,
             Height = (double)Height / screenHeight
         };

@@ -19,8 +19,8 @@
             </Border.Effect>
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#1a1a2e" Offset="0"/>
-                    <GradientStop Color="#16213e" Offset="1"/>
+                    <GradientStop Color="{StaticResource SplashGradientStartColor}" Offset="0"/>
+                    <GradientStop Color="{StaticResource SplashGradientEndColor}" Offset="1"/>
                 </LinearGradientBrush>
             </Border.Background>
             
@@ -39,16 +39,16 @@
                        Margin="0,30,0,0"
                        RenderOptions.BitmapScalingMode="HighQuality">
                     <Image.Effect>
-                        <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.6" Color="#00a8ff"/>
+                        <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.6" Color="{StaticResource SplashShadowColor}"/>
                     </Image.Effect>
                 </Image>
                 
                 <!-- App Name -->
                 <TextBlock Grid.Row="1" 
                            Text="Idol Click" 
-                           FontSize="28" 
+                           FontSize="{StaticResource FontSizeHero}" 
                            FontWeight="SemiBold"
-                           Foreground="White"
+                           Foreground="{StaticResource TextBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,10,0,5"/>
                 
@@ -56,20 +56,20 @@
                 <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,10,0,0">
                     <TextBlock x:Name="StatusText" 
                                Text="Initializing..." 
-                               FontSize="12" 
-                               Foreground="#a0a0a0"
+                               FontSize="{StaticResource FontSizeBodySm}" 
+                               Foreground="{StaticResource TextSecondaryBrush}"
                                HorizontalAlignment="Center"/>
                     
                     <!-- Progress bar -->
-                    <Border Margin="0,12,0,0" Width="200" Height="3" CornerRadius="2" Background="#2a2a3e">
+                    <Border Margin="0,12,0,0" Width="200" Height="3" CornerRadius="2" Background="{StaticResource SplashTrackBrush}">
                         <Border x:Name="ProgressBar" 
                                 HorizontalAlignment="Left" 
                                 Width="0" 
                                 CornerRadius="2">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop Color="#0078D4" Offset="0"/>
-                                    <GradientStop Color="#00a8ff" Offset="1"/>
+                                    <GradientStop Color="{StaticResource PrimaryColor}" Offset="0"/>
+                                    <GradientStop Color="{StaticResource PrimaryLightColor}" Offset="1"/>
                                 </LinearGradientBrush>
                             </Border.Background>
                         </Border>
@@ -79,8 +79,8 @@
                 <!-- Version -->
                 <TextBlock Grid.Row="3" 
                            Text="v1.0.0" 
-                           FontSize="11" 
-                           Foreground="#606060"
+                           FontSize="{StaticResource FontSizeCaption}" 
+                           Foreground="{StaticResource SplashVersionBrush}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"/>
             </Grid>

@@ -90,8 +90,8 @@ public class ConfigService
     }
 
     /// <summary>
-    /// Saves the configuration to disk. Secrets (API keys, endpoints) are written
-    /// to a separate secrets.json file and stripped from config.json.
+    /// Saves the configuration to disk. Secrets are written to the local kv store
+    /// and stripped from config.json.
     /// </summary>
     /// <param name="config">The configuration to save.</param>
     public void SaveConfig(AppConfig config)
@@ -100,16 +100,27 @@ public class ConfigService
         
         lock (_lock)
         {
+            NormalizeAiConfiguration(config);
+
             // Extract secrets and save separately
-            SaveSecrets(config.AgentSettings);
+            SaveSecrets(config);
 
             // Write config.json WITHOUT secrets (empty placeholders)
+            var ai = config.Ai;
             var agent = config.AgentSettings;
+            var savedAiEndpoint = ai.Endpoint;
+            var savedAiApiKey = ai.ApiKey;
+            var savedAiWhisperEndpoint = ai.WhisperEndpoint;
+            var savedAiWhisperApiKey = ai.WhisperApiKey;
             var savedEndpoint = agent.Endpoint;
             var savedApiKey = agent.ApiKey;
             var savedWhisperEndpoint = agent.WhisperEndpoint;
             var savedWhisperApiKey = agent.WhisperApiKey;
 
+            ai.Endpoint = "";
+            ai.ApiKey = "";
+            ai.WhisperEndpoint = "";
+            ai.WhisperApiKey = "";
             agent.Endpoint = "";
             agent.ApiKey = "";
             agent.WhisperEndpoint = "";
@@ -119,6 +130,10 @@ public class ConfigService
             File.WriteAllText(_configPath, json);
 
             // Restore in-memory values so the running app still works
+            ai.Endpoint = savedAiEndpoint;
+            ai.ApiKey = savedAiApiKey;
+            ai.WhisperEndpoint = savedAiWhisperEndpoint;
+            ai.WhisperApiKey = savedAiWhisperApiKey;
             agent.Endpoint = savedEndpoint;
             agent.ApiKey = savedApiKey;
             agent.WhisperEndpoint = savedWhisperEndpoint;
@@ -158,8 +173,9 @@ public class ConfigService
             _lastModified = File.GetLastWriteTimeUtc(_configPath);
             var config = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions) ?? CreateDefaultConfig();
 
-            // Merge secrets from secrets.json (survives bin wipes)
-            LoadSecrets(config.AgentSettings);
+            // Merge secrets from the local kv store and normalize top-level AI settings.
+            LoadSecrets(config);
+            NormalizeAiConfiguration(config);
             
             // Upgrade old schemas if needed
             var upgradeCount = 0;
@@ -196,11 +212,10 @@ public class ConfigService
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Loads secrets from secrets.json and merges into the AgentSettings.
-    /// Secrets override empty config values — if a user has keys in secrets.json,
-    /// they're applied even when config.json has empty placeholders.
+    /// Loads secrets from the local kv store and merges them into the top-level AI section.
+    /// Legacy secret keys are still accepted for backward compatibility.
     /// </summary>
-    private void LoadSecrets(AgentSettings agent)
+    private void LoadSecrets(AppConfig config)
     {
         try
         {
@@ -209,18 +224,19 @@ public class ConfigService
             var json = File.ReadAllText(_secretsPath);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+            var ai = config.Ai;
 
-            if (root.TryGetProperty("endpoint", out var ep) && ep.GetString() is string endpoint && !string.IsNullOrWhiteSpace(endpoint))
-                agent.Endpoint = endpoint;
+            if (TryReadSecret(root, "aiEndpoint", out var endpoint) || TryReadSecret(root, "endpoint", out endpoint))
+                ai.Endpoint = endpoint;
 
-            if (root.TryGetProperty("apiKey", out var ak) && ak.GetString() is string apiKey && !string.IsNullOrWhiteSpace(apiKey))
-                agent.ApiKey = apiKey;
+            if (TryReadSecret(root, "aiApiKey", out var apiKey) || TryReadSecret(root, "apiKey", out apiKey))
+                ai.ApiKey = apiKey;
 
-            if (root.TryGetProperty("whisperEndpoint", out var wep) && wep.GetString() is string whisperEndpoint && !string.IsNullOrWhiteSpace(whisperEndpoint))
-                agent.WhisperEndpoint = whisperEndpoint;
+            if (TryReadSecret(root, "aiWhisperEndpoint", out var whisperEndpoint) || TryReadSecret(root, "whisperEndpoint", out whisperEndpoint))
+                ai.WhisperEndpoint = whisperEndpoint;
 
-            if (root.TryGetProperty("whisperApiKey", out var wak) && wak.GetString() is string whisperApiKey && !string.IsNullOrWhiteSpace(whisperApiKey))
-                agent.WhisperApiKey = whisperApiKey;
+            if (TryReadSecret(root, "aiWhisperApiKey", out var whisperApiKey) || TryReadSecret(root, "whisperApiKey", out whisperApiKey))
+                ai.WhisperApiKey = whisperApiKey;
 
             System.Diagnostics.Debug.WriteLine($"[ConfigService] Secrets loaded from: {_secretsPath}");
         }
@@ -231,22 +247,23 @@ public class ConfigService
     }
 
     /// <summary>
-    /// Saves secrets to secrets.json. Only writes non-empty values.
+    /// Saves secrets to the local kv store. Only writes non-empty values.
     /// </summary>
-    private void SaveSecrets(AgentSettings agent)
+    private void SaveSecrets(AppConfig config)
     {
         try
         {
             var secrets = new Dictionary<string, string>();
+            var ai = config.Ai;
 
-            if (!string.IsNullOrWhiteSpace(agent.Endpoint))
-                secrets["endpoint"] = agent.Endpoint;
-            if (!string.IsNullOrWhiteSpace(agent.ApiKey))
-                secrets["apiKey"] = agent.ApiKey;
-            if (!string.IsNullOrWhiteSpace(agent.WhisperEndpoint))
-                secrets["whisperEndpoint"] = agent.WhisperEndpoint;
-            if (!string.IsNullOrWhiteSpace(agent.WhisperApiKey))
-                secrets["whisperApiKey"] = agent.WhisperApiKey;
+            if (!string.IsNullOrWhiteSpace(ai.Endpoint))
+                secrets["aiEndpoint"] = ai.Endpoint;
+            if (!string.IsNullOrWhiteSpace(ai.ApiKey))
+                secrets["aiApiKey"] = ai.ApiKey;
+            if (!string.IsNullOrWhiteSpace(ai.WhisperEndpoint))
+                secrets["aiWhisperEndpoint"] = ai.WhisperEndpoint;
+            if (!string.IsNullOrWhiteSpace(ai.WhisperApiKey))
+                secrets["aiWhisperApiKey"] = ai.WhisperApiKey;
 
             if (secrets.Count > 0)
             {
@@ -259,6 +276,32 @@ public class ConfigService
         {
             System.Diagnostics.Debug.WriteLine($"[ConfigService] Failed to save secrets: {ex.Message}");
         }
+    }
+
+    private static bool TryReadSecret(JsonElement root, string propertyName, out string value)
+    {
+        value = string.Empty;
+        if (!root.TryGetProperty(propertyName, out var property))
+            return false;
+
+        var raw = property.GetString();
+        if (string.IsNullOrWhiteSpace(raw))
+            return false;
+
+        value = raw;
+        return true;
+    }
+
+    private static void NormalizeAiConfiguration(AppConfig config)
+    {
+        if (config.Ai.HasExplicitValues())
+        {
+            config.Ai.CopyTo(config.AgentSettings);
+            return;
+        }
+
+        config.Ai.CopyFrom(config.AgentSettings);
+        config.Ai.CopyTo(config.AgentSettings);
     }
 
     /// <summary>
@@ -323,6 +366,22 @@ public class ConfigService
                 ToastOnRuleMatch = false,
                 IncludeTimestamp = true
             }
+        },
+        Ai = new AppAiSettings
+        {
+            Endpoint = "",
+            ModelId = "gpt-4o",
+            ApiKey = "",
+            MaxTokens = 4096,
+            Temperature = 0,
+            VisionFallbackEnabled = false,
+            VisionConfidenceThreshold = 0.7,
+            VisionModelId = "",
+            VoiceInputEnabled = true,
+            WhisperDeploymentId = "whisper",
+            WhisperEndpoint = "",
+            WhisperApiKey = "",
+            VoiceLanguage = ""
         },
         AgentSettings = new AgentSettings
         {

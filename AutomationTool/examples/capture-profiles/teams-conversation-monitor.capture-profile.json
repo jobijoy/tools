@@ -1,0 +1,46 @@
+{
+  "$schema": "../../schemas/capture-profile-pack.schema.json",
+  "schemaVersion": 1,
+  "packId": "teams-conversation-monitor",
+  "name": "Teams Conversation Monitor",
+  "description": "Canonical collaboration-monitoring pack: open Teams, park on a conversation, and capture repeated conversation snapshots for later summarization or decision support.",
+  "category": "collaboration-monitoring",
+  "bootstrapFlowPath": "../teams-conversation-bootstrap.json",
+  "statusSelectors": [
+    "Window#Microsoft Teams",
+    "Document#Posts",
+    "List#ChatList"
+  ],
+  "observationPlan": {
+    "triggerMode": "status-change",
+    "intervalSeconds": 20,
+    "durationSeconds": 300,
+    "audioClipSeconds": 0,
+    "queueSnapshots": true,
+    "statusChangeHint": "Queue a capture on unread badge changes, conversation focus changes, or message count growth.",
+    "notes": "Selectors vary across classic Teams and new Teams; treat this as a canonical template and refine with InspectWindow on your machine."
+  },
+  "queue": {
+    "enabled": true,
+    "queueId": "teams-conversation-monitor",
+    "consumerHint": "A downstream analyzer can summarize the latest visible conversation state from repeated snapshots.",
+    "analysisHint": "Use message-thread visual diffs to detect new messages or state transitions before making workflow decisions."
+  },
+  "captureProfile": {
+    "id": "teams-conversation-monitor",
+    "name": "Teams Conversation Monitor",
+    "enabled": true,
+    "filePrefix": "teams_chat",
+    "outputDirectory": "",
+    "targets": [
+      {
+        "id": "teams-main-window",
+        "name": "Teams Main Window",
+        "kind": "Window",
+        "processName": "ms-teams",
+        "windowTitle": "Microsoft Teams",
+        "windowHandleHint": 0
+      }
+    ]
+  }
+}

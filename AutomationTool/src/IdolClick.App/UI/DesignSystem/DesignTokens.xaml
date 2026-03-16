@@ -1,0 +1,189 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Base palette -->
+    <Color x:Key="PrimaryColor">#0078D4</Color>
+    <Color x:Key="PrimaryDarkColor">#106EBE</Color>
+    <Color x:Key="PrimaryLightColor">#3794E3</Color>
+    <Color x:Key="AccentColor">#10B981</Color>
+    <Color x:Key="BackgroundColor">#1E1E1E</Color>
+    <Color x:Key="SurfaceColor">#252526</Color>
+    <Color x:Key="SurfaceElevatedColor">#2D2D30</Color>
+    <Color x:Key="CardColor">#333337</Color>
+    <Color x:Key="BorderColor">#3F3F46</Color>
+    <Color x:Key="BorderSubtleColor">#2D2D30</Color>
+    <Color x:Key="TextColor">#E8E8E8</Color>
+    <Color x:Key="TextSecondaryColor">#969696</Color>
+    <Color x:Key="TextMutedColor">#505050</Color>
+    <Color x:Key="ErrorColor">#F14C4C</Color>
+    <Color x:Key="ErrorDarkColor">#D32F2F</Color>
+    <Color x:Key="WarningColor">#CCA700</Color>
+    <Color x:Key="SuccessColor">#10B981</Color>
+    <Color x:Key="AccentDarkColor">#059669</Color>
+    <Color x:Key="ActivityBarColor">#181818</Color>
+    <Color x:Key="ActivityBarHoverColor">#2A2D2E</Color>
+    <Color x:Key="SurfaceInteractiveColor">#3E3E42</Color>
+
+    <!-- Semantic extension tokens for future skins -->
+    <Color x:Key="OverlayBackdropColor">#E0000000</Color>
+    <Color x:Key="PanelOverlayColor">#D91E1E1E</Color>
+    <Color x:Key="OrbShellColor">#FF10161D</Color>
+    <Color x:Key="OrbCoreColor">#FF0F8CEE</Color>
+    <Color x:Key="OrbCoreAccentColor">#FF2EE6A6</Color>
+    <Color x:Key="OrbHaloColor">#8044C8FF</Color>
+    <Color x:Key="OrbSparkColor">#D8F7FFFD</Color>
+    <Color x:Key="ShadowAccentColor">#0078D4</Color>
+    <Color x:Key="ShadowSuccessColor">#10B981</Color>
+    <Color x:Key="WindowGlassColor">#EA1A1A1A</Color>
+    <Color x:Key="SurfaceTintColor">#1AFFFFFF</Color>
+    <Color x:Key="SelectionOverlayColor">#40000000</Color>
+    <Color x:Key="SelectionStrokeColor">#00AAFF</Color>
+    <Color x:Key="SelectionFillColor">#2000AAFF</Color>
+    <Color x:Key="SelectionInvalidColor">#FF6464</Color>
+    <Color x:Key="SplashGradientStartColor">#1A1A2E</Color>
+    <Color x:Key="SplashGradientEndColor">#16213E</Color>
+    <Color x:Key="SplashTrackColor">#2A2A3E</Color>
+    <Color x:Key="SplashShadowColor">#00A8FF</Color>
+    <Color x:Key="SplashVersionColor">#606060</Color>
+    <Color x:Key="CapturePanelGlassColor">#F0181B20</Color>
+    <Color x:Key="CaptureTileOverlayColor">#D9202328</Color>
+    <Color x:Key="CaptureTileHoverOverlayColor">#F0282C33</Color>
+    <Color x:Key="CaptureTimelineCardColor">#FF20242A</Color>
+    <Color x:Key="CaptureOrbBorderColor">#703794E3</Color>
+    <Color x:Key="CaptureOrbRingColor">#3A3794E3</Color>
+    <Color x:Key="CaptureWorkspaceShellStartColor">#F020242B</Color>
+    <Color x:Key="CaptureWorkspaceShellEndColor">#F014171C</Color>
+    <Color x:Key="CaptureWorkspaceHeaderStartColor">#FF2A3038</Color>
+    <Color x:Key="CaptureWorkspaceHeaderEndColor">#FF1B1F25</Color>
+    <Color x:Key="CaptureWorkspaceCardColor">#F62A2E35</Color>
+    <Color x:Key="CaptureWorkspaceCardEdgeColor">#503794E3</Color>
+    <Color x:Key="CaptureWorkspaceGlowColor">#7010B981</Color>
+    <Color x:Key="CaptureWorkspaceShadowColor">#AA000000</Color>
+    <Color x:Key="CaptureWorkspaceInsetColor">#18FFFFFF</Color>
+    <Color x:Key="LauncherShellStartColor">#F0292D33</Color>
+    <Color x:Key="LauncherShellEndColor">#F01D2025</Color>
+    <Color x:Key="LauncherHeaderStartColor">#FF2D3238</Color>
+    <Color x:Key="LauncherHeaderEndColor">#FF24282D</Color>
+    <Color x:Key="LauncherCardColor">#F632373E</Color>
+    <Color x:Key="LauncherCardHoverColor">#FB3A4149</Color>
+    <Color x:Key="LauncherCardEdgeColor">#403794E3</Color>
+    <Color x:Key="LauncherPillColor">#16FFFFFF</Color>
+    <Color x:Key="LauncherShadowColor">#88000000</Color>
+    <Color x:Key="PremiumButtonGlowColor">#500078D4</Color>
+
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDarkColor}"/>
+    <SolidColorBrush x:Key="PrimaryLightBrush" Color="{StaticResource PrimaryLightColor}"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SurfaceElevatedBrush" Color="{StaticResource SurfaceElevatedColor}"/>
+    <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}"/>
+    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}"/>
+    <SolidColorBrush x:Key="ErrorDarkBrush" Color="{StaticResource ErrorDarkColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+    <SolidColorBrush x:Key="ActivityBarBrush" Color="{StaticResource ActivityBarColor}"/>
+    <SolidColorBrush x:Key="ActivityBarHoverBrush" Color="{StaticResource ActivityBarHoverColor}"/>
+    <SolidColorBrush x:Key="SurfaceInteractiveBrush" Color="{StaticResource SurfaceInteractiveColor}"/>
+    <SolidColorBrush x:Key="AccentDarkBrush" Color="{StaticResource AccentDarkColor}"/>
+
+    <SolidColorBrush x:Key="OverlayBackdropBrush" Color="{StaticResource OverlayBackdropColor}"/>
+    <SolidColorBrush x:Key="PanelOverlayBrush" Color="{StaticResource PanelOverlayColor}"/>
+    <SolidColorBrush x:Key="OrbShellBrush" Color="{StaticResource OrbShellColor}"/>
+    <SolidColorBrush x:Key="OrbCoreBrush" Color="{StaticResource OrbCoreColor}"/>
+    <SolidColorBrush x:Key="OrbCoreAccentBrush" Color="{StaticResource OrbCoreAccentColor}"/>
+    <SolidColorBrush x:Key="OrbHaloBrush" Color="{StaticResource OrbHaloColor}"/>
+    <SolidColorBrush x:Key="OrbSparkBrush" Color="{StaticResource OrbSparkColor}"/>
+    <SolidColorBrush x:Key="WindowGlassBrush" Color="{StaticResource WindowGlassColor}"/>
+    <SolidColorBrush x:Key="SurfaceTintBrush" Color="{StaticResource SurfaceTintColor}"/>
+    <SolidColorBrush x:Key="SelectionOverlayBrush" Color="{StaticResource SelectionOverlayColor}"/>
+    <SolidColorBrush x:Key="SelectionStrokeBrush" Color="{StaticResource SelectionStrokeColor}"/>
+    <SolidColorBrush x:Key="SelectionFillBrush" Color="{StaticResource SelectionFillColor}"/>
+    <SolidColorBrush x:Key="SelectionInvalidBrush" Color="{StaticResource SelectionInvalidColor}"/>
+    <SolidColorBrush x:Key="SplashTrackBrush" Color="{StaticResource SplashTrackColor}"/>
+    <SolidColorBrush x:Key="SplashVersionBrush" Color="{StaticResource SplashVersionColor}"/>
+    <SolidColorBrush x:Key="CapturePanelGlassBrush" Color="{StaticResource CapturePanelGlassColor}"/>
+    <SolidColorBrush x:Key="CaptureTileOverlayBrush" Color="{StaticResource CaptureTileOverlayColor}"/>
+    <SolidColorBrush x:Key="CaptureTileHoverOverlayBrush" Color="{StaticResource CaptureTileHoverOverlayColor}"/>
+    <SolidColorBrush x:Key="CaptureTimelineCardBrush" Color="{StaticResource CaptureTimelineCardColor}"/>
+    <SolidColorBrush x:Key="CaptureOrbBorderBrush" Color="{StaticResource CaptureOrbBorderColor}"/>
+    <SolidColorBrush x:Key="CaptureOrbRingBrush" Color="{StaticResource CaptureOrbRingColor}"/>
+    <SolidColorBrush x:Key="CaptureWorkspaceCardBrush" Color="{StaticResource CaptureWorkspaceCardColor}"/>
+    <SolidColorBrush x:Key="CaptureWorkspaceCardEdgeBrush" Color="{StaticResource CaptureWorkspaceCardEdgeColor}"/>
+    <SolidColorBrush x:Key="CaptureWorkspaceGlowBrush" Color="{StaticResource CaptureWorkspaceGlowColor}"/>
+    <SolidColorBrush x:Key="CaptureWorkspaceInsetBrush" Color="{StaticResource CaptureWorkspaceInsetColor}"/>
+    <SolidColorBrush x:Key="LauncherCardBrush" Color="{StaticResource LauncherCardColor}"/>
+    <SolidColorBrush x:Key="LauncherCardHoverBrush" Color="{StaticResource LauncherCardHoverColor}"/>
+    <SolidColorBrush x:Key="LauncherCardEdgeBrush" Color="{StaticResource LauncherCardEdgeColor}"/>
+    <SolidColorBrush x:Key="LauncherPillBrush" Color="{StaticResource LauncherPillColor}"/>
+
+    <LinearGradientBrush x:Key="CaptureWorkspaceShellBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource CaptureWorkspaceShellStartColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource CaptureWorkspaceShellEndColor}" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="CaptureWorkspaceHeaderBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource CaptureWorkspaceHeaderStartColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource CaptureWorkspaceHeaderEndColor}" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="LauncherShellBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource LauncherShellStartColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource LauncherShellEndColor}" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="LauncherHeaderBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource LauncherHeaderStartColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource LauncherHeaderEndColor}" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Mode accents -->
+    <SolidColorBrush x:Key="WorkspaceClassicBrush" Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="WorkspaceReasonBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="WorkspaceTeachBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="WorkspaceCaptureBrush" Color="{StaticResource SuccessColor}"/>
+
+    <!-- Typography -->
+    <FontFamily x:Key="AppFont">Segoe UI, Segoe UI Variable Text, Arial</FontFamily>
+    <FontFamily x:Key="HeadingFont">Segoe UI Semibold, Segoe UI, Arial</FontFamily>
+    <FontFamily x:Key="MonoFont">Cascadia Mono, Cascadia Code, Consolas, Courier New</FontFamily>
+
+    <sys:Double x:Key="FontSizeH1">22</sys:Double>
+    <sys:Double x:Key="FontSizeH2">18</sys:Double>
+    <sys:Double x:Key="FontSizeH3">15</sys:Double>
+    <sys:Double x:Key="FontSizeBody">13</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">11</sys:Double>
+    <sys:Double x:Key="FontSizeSmall">10</sys:Double>
+    <sys:Double x:Key="FontSizeMono">12</sys:Double>
+    <sys:Double x:Key="FontSizeMicro">8</sys:Double>
+    <sys:Double x:Key="FontSizeTiny">9</sys:Double>
+    <sys:Double x:Key="FontSizeBodySm">12</sys:Double>
+    <sys:Double x:Key="FontSizeTitle">16</sys:Double>
+    <sys:Double x:Key="FontSizeDisplay">32</sys:Double>
+    <sys:Double x:Key="FontSizeHero">28</sys:Double>
+
+    <!-- Spacing and radius -->
+    <Thickness x:Key="SpacingXs">4</Thickness>
+    <Thickness x:Key="SpacingSm">8</Thickness>
+    <Thickness x:Key="SpacingMd">12</Thickness>
+    <Thickness x:Key="SpacingLg">16</Thickness>
+    <Thickness x:Key="SpacingXl">24</Thickness>
+    <Thickness x:Key="SpacingXxl">32</Thickness>
+    <CornerRadius x:Key="RadiusSm">4</CornerRadius>
+    <CornerRadius x:Key="RadiusMd">6</CornerRadius>
+    <CornerRadius x:Key="RadiusLg">8</CornerRadius>
+    <CornerRadius x:Key="RadiusXl">12</CornerRadius>
+    <CornerRadius x:Key="RadiusPill">14</CornerRadius>
+
+    <!-- Shared sizing -->
+    <sys:Double x:Key="IconButtonSize">34</sys:Double>
+    <sys:Double x:Key="NavRailWidth">48</sys:Double>
+    <sys:Double x:Key="CardBorderThickness">1</sys:Double>
+</ResourceDictionary>

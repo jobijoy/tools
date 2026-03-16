@@ -173,6 +173,9 @@ dotnet publish -c Release -r win-x64 --self-contained false
 
 | Document | Audience | Description |
 |----------|----------|-------------|
+| [CURRENT-STATE.md](CURRENT-STATE.md) | Everyone | Current validated status, mode maturity, test coverage, and known risks |
+| [DOCS-INDEX.md](DOCS-INDEX.md) | Everyone | Documentation map, source-of-truth ownership, and recommended read paths |
+| [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) | UI contributors | Theme/token architecture, styling rules, and future skinning guidance |
 | [PRODUCT.md](PRODUCT.md) | Everyone | Full product narrative, DSL spec, safety model |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Architects | Layer architecture, data flow, components |
 | [AGENTS-GUIDE.md](AGENTS-GUIDE.md) | Coding agents | Conventions, common tasks, file map |

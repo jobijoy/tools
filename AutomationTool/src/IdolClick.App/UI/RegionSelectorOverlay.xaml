@@ -8,7 +8,6 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        WindowState="Maximized"
         Cursor="Cross"
         KeyDown="Window_KeyDown"
         MouseDown="Window_MouseDown"
@@ -17,27 +16,27 @@
 
     <Grid>
         <!-- Semi-transparent overlay -->
-        <Rectangle x:Name="OverlayBackground" Fill="#40000000" IsHitTestVisible="False"/>
+        <Rectangle x:Name="OverlayBackground" Fill="{StaticResource SelectionOverlayBrush}" IsHitTestVisible="False"/>
 
         <!-- Selection rectangle -->
         <Canvas x:Name="SelectionCanvas">
             <Rectangle x:Name="SelectionRect" 
-                       Stroke="#00AAFF" 
+                       Stroke="{StaticResource SelectionStrokeBrush}" 
                        StrokeThickness="2" 
                        StrokeDashArray="4 2"
-                       Fill="#2000AAFF"
+                       Fill="{StaticResource SelectionFillBrush}"
                        Visibility="Collapsed"/>
             
             <!-- Dimension label -->
             <Border x:Name="DimensionLabel" 
-                    Background="#E0000000" 
+                    Background="{StaticResource OverlayBackdropBrush}" 
                     CornerRadius="4" 
                     Padding="8,4"
                     Visibility="Collapsed">
                 <TextBlock x:Name="DimensionText" 
-                           Foreground="White" 
-                           FontFamily="Consolas" 
-                           FontSize="12"/>
+                           Foreground="{StaticResource TextBrush}" 
+                           FontFamily="{StaticResource MonoFont}" 
+                           FontSize="{StaticResource FontSizeBodySm}"/>
             </Border>
         </Canvas>
 
@@ -45,18 +44,18 @@
         <Border HorizontalAlignment="Center" 
                 VerticalAlignment="Top" 
                 Margin="0,50,0,0"
-                Background="#E0000000" 
+                Background="{StaticResource OverlayBackdropBrush}" 
                 CornerRadius="8" 
                 Padding="20,15">
             <StackPanel>
                 <TextBlock Text="🖱 Click and drag to select a region" 
-                           Foreground="White" 
-                           FontSize="16" 
+                           Foreground="{StaticResource TextBrush}" 
+                           FontSize="{StaticResource FontSizeTitle}" 
                            FontWeight="SemiBold"
                            HorizontalAlignment="Center"/>
                 <TextBlock Text="Press ESC to cancel • Enter to confirm" 
-                           Foreground="#AAAAAA" 
-                           FontSize="12"
+                           Foreground="{StaticResource TextSecondaryBrush}" 
+                           FontSize="{StaticResource FontSizeBodySm}"
                            HorizontalAlignment="Center"
                            Margin="0,8,0,0"/>
             </StackPanel>
@@ -64,16 +63,16 @@
 
         <!-- Coordinates display -->
         <Border x:Name="CoordinatesPanel"
-                HorizontalAlignment="Left" 
-                VerticalAlignment="Bottom" 
-                Margin="20,0,0,20"
-                Background="#E0000000" 
-                CornerRadius="4" 
-                Padding="12,8">
+            HorizontalAlignment="Left" 
+            VerticalAlignment="Bottom" 
+            Margin="20,0,0,20"
+            Background="{StaticResource OverlayBackdropBrush}" 
+            CornerRadius="4" 
+            Padding="12,8">
             <TextBlock x:Name="CoordinatesText" 
-                       Foreground="White" 
-                       FontFamily="Consolas" 
-                       FontSize="11"
+                   Foreground="{StaticResource TextBrush}" 
+                   FontFamily="{StaticResource MonoFont}" 
+                   FontSize="{StaticResource FontSizeCaption}"
                        Text="Position: (0, 0)"/>
         </Border>
     </Grid>

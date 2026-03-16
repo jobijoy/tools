@@ -153,7 +153,14 @@ public sealed class VoiceInputService : IDisposable
     /// </summary>
     public async Task StopRecordingAndTranscribeAsync()
     {
-        if (!_isRecording) return;
+        var result = await StopRecordingAndTranscribeDetailedAsync().ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(result?.Text))
+            OnTranscriptionReady?.Invoke(result.Text);
+    }
+
+    public async Task<VoiceTranscriptionResult?> StopRecordingAndTranscribeDetailedAsync()
+    {
+        if (!_isRecording) return null;
         _isRecording = false;
 
         try
@@ -178,7 +185,7 @@ public sealed class VoiceInputService : IDisposable
             {
                 _log.Warn("VoiceInput", "Recording too short, skipping transcription");
                 OnError?.Invoke("Recording too short — please try again");
-                return;
+                return null;
             }
 
             _log.Info("VoiceInput", $"Sending {audioBytes.Length / 1024}KB audio to Whisper");
@@ -187,18 +194,20 @@ public sealed class VoiceInputService : IDisposable
             if (!string.IsNullOrWhiteSpace(text))
             {
                 _log.Info("VoiceInput", $"Transcription: \"{text}\"");
-                OnTranscriptionReady?.Invoke(text.Trim());
+                return new VoiceTranscriptionResult(text.Trim(), audioBytes);
             }
             else
             {
                 _log.Warn("VoiceInput", "Empty transcription result");
                 OnError?.Invoke("Could not understand audio — please try again");
+                return null;
             }
         }
         catch (Exception ex)
         {
             _log.Error("VoiceInput", $"Transcription failed: {ex.Message}");
             OnError?.Invoke($"Transcription failed: {ex.Message}");
+            return null;
         }
         finally
         {
@@ -427,3 +436,5 @@ public sealed class VoiceInputService : IDisposable
         _httpClient.Dispose();
     }
 }
+
+public sealed record VoiceTranscriptionResult(string Text, byte[] AudioBytes);

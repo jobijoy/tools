@@ -26,9 +26,8 @@ internal static class FlowEndpoints
     public static void Map(WebApplication app)
     {
         // ── Flow validation ─────────────────────────────────────────────────
-        app.MapPost("/api/flows/validate", (HttpContext ctx) =>
-        {
-            return HandleAsync(ctx, async () =>
+        app.MapPost("/api/flows/validate", (Delegate)(async (HttpContext ctx) =>
+            await HandleAsync(ctx, async () =>
             {
                 var body = await ReadBodyAsync(ctx);
                 var flow = JsonSerializer.Deserialize<TestFlow>(body, FlowJson.Options);
@@ -46,13 +45,11 @@ internal static class FlowEndpoints
                     stepCount = flow.Steps.Count,
                     testName = flow.TestName
                 });
-            });
-        });
+            })));
 
         // ── Flow execution ──────────────────────────────────────────────────
-        app.MapPost("/api/flows/run", (HttpContext ctx) =>
-        {
-            return HandleAsync(ctx, async () =>
+        app.MapPost("/api/flows/run", (Delegate)(async (HttpContext ctx) =>
+            await HandleAsync(ctx, async () =>
             {
                 var body = await ReadBodyAsync(ctx);
                 var flow = JsonSerializer.Deserialize<TestFlow>(body, FlowJson.Options);
@@ -87,8 +84,60 @@ internal static class FlowEndpoints
                 App.Reports.SaveReport(report);
 
                 return Results.Ok(JsonSerializer.SerializeToElement(report, FlowJson.Options));
-            });
-        });
+            })));
+
+        app.MapPost("/api/flows/run-from-prompt", (Delegate)(async (HttpContext ctx) =>
+            await HandleAsync(ctx, async () =>
+            {
+                var body = await ReadBodyAsync(ctx);
+                var request = JsonSerializer.Deserialize<PromptFlowRequest>(body, FlowJson.Options);
+                if (request == null || string.IsNullOrWhiteSpace(request.Input))
+                    return Results.BadRequest(new { error = "Input text is required" });
+
+                if (App.IntentSplitter == null)
+                    return Results.Problem("Intent splitter not initialized", statusCode: 503);
+
+                var executionContext = new ExecutionContext
+                {
+                    IsInteractive = request.Interactive ?? true,
+                    IsPackPipeline = request.PackPipeline ?? false,
+                    TrustMode = request.TrustMode ?? false
+                };
+
+                var orchestrator = new PromptFlowOrchestratorService(
+                    App.IntentSplitter,
+                    App.FlowExecutor,
+                    App.Reports,
+                    App.Log);
+
+                var result = await orchestrator.RunAsync(
+                    request.Input,
+                    executionContext,
+                    request.ConfirmExecution ?? false,
+                    ctx.RequestAborted);
+
+                return Results.Ok(new
+                {
+                    input = result.Input,
+                    templateId = result.TemplateId,
+                    templateName = result.TemplateName,
+                    tier = result.Tier.ToString(),
+                    reason = result.Reason,
+                    requiresConfirmation = result.RequiresConfirmation,
+                    executed = result.Executed,
+                    succeeded = result.Succeeded,
+                    error = result.Error,
+                    reportPath = result.ReportPath,
+                    validationErrors = result.ValidationErrors,
+                    validationWarnings = result.ValidationWarnings,
+                    draftFlow = result.DraftFlow != null
+                        ? JsonSerializer.SerializeToElement(result.DraftFlow, FlowJson.Options)
+                        : (JsonElement?)null,
+                    report = result.Report != null
+                        ? JsonSerializer.SerializeToElement(result.Report, FlowJson.Options)
+                        : (JsonElement?)null
+                });
+            })));
 
         // ── List reports ────────────────────────────────────────────────────
         app.MapGet("/api/reports", (int? max) =>
@@ -183,5 +232,14 @@ internal static class FlowEndpoints
             App.Log?.Error("FlowEndpoints", $"Unhandled error: {ex.Message}");
             return Results.Problem(ex.Message, statusCode: 500);
         }
+    }
+
+    private sealed class PromptFlowRequest
+    {
+        public string Input { get; set; } = string.Empty;
+        public bool? Interactive { get; set; }
+        public bool? PackPipeline { get; set; }
+        public bool? TrustMode { get; set; }
+        public bool? ConfirmExecution { get; set; }
     }
 }

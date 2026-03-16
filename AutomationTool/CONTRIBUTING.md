@@ -28,9 +28,23 @@ Thank you for your interest in contributing to IdolClick! This document provides
 1. Create a feature branch from `main`
 2. Make focused, atomic commits
 3. Ensure `dotnet build` succeeds with zero errors and zero warnings
-4. Update relevant documentation (ARCHITECTURE.md, PRODUCT.md) if you change behavior
-5. Add or update JSON schemas in `schemas/` if you modify model contracts
+4. Run `dotnet test IdolClick.sln -c Release` when you change Commands, API, or shared contracts
+5. Update relevant documentation using the ownership rules in `DOCS-INDEX.md`
+6. Update `CURRENT-STATE.md` if validated status, maturity, or verification commands change
+7. Add or update JSON schemas in `schemas/` if you modify model contracts
 6. Open a PR with a clear description of what and why
+
+### Documentation Hygiene
+
+Use the documentation map in `DOCS-INDEX.md` to avoid contradictory edits.
+
+- `CURRENT-STATE.md` owns validated status and current maturity language
+- `README.md` owns quick orientation and document discovery
+- `ARCHITECTURE.md` owns runtime structure and component boundaries
+- `PRODUCT.md` owns product positioning and external behavior
+- `AGENTS-GUIDE.md` owns coding workflows and repo conventions
+
+When a change affects more than one of these concerns, update each document for its concern only instead of copying the same paragraph into all of them.
 
 ### Code Style
 

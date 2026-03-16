@@ -8,15 +8,19 @@ using IdolClick.Models;
 namespace IdolClick.UI;
 
 /// <summary>
-/// Mode selection screen shown on first launch (or when <see cref="GlobalSettings.SkipHomeScreen"/> is false).
-/// Lets the user pick Classic, Agent, or Teach — only the services for that mode are loaded.
+/// Welcome launcher for IdolClick's utility families.
+/// Lets the user choose a workspace or continue with the last-used utility.
 /// </summary>
 public partial class HomeWindow : Window
 {
+    private AppMode _lastMode;
+
     public HomeWindow()
     {
         InitializeComponent();
         VersionText.Text = $"v{Services.ServiceHost.Version}";
+        _lastMode = App.Config.GetConfig().Settings.Mode;
+        UpdateLastUsedUi();
         SourceInitialized += (_, _) => EnableResizeBorder();
     }
 
@@ -24,32 +28,19 @@ public partial class HomeWindow : Window
     {
         var tag = (string)((FrameworkElement)sender).Tag;
         var mode = Enum.Parse<AppMode>(tag);
-
-        if (RememberCheck.IsChecked == true)
-        {
-            var config = App.Config.GetConfig();
-            config.Settings.Mode = mode;
-            config.Settings.SkipHomeScreen = true;
-            App.Config.SaveConfig(config);
-        }
-
-        ((App)Application.Current).LaunchMode(mode);
+        LaunchSelectedMode(mode);
     }
 
     private void Card_Click(object sender, MouseButtonEventArgs e)
     {
         var tag = (string)((FrameworkElement)sender).Tag;
         var mode = Enum.Parse<AppMode>(tag);
+        LaunchSelectedMode(mode);
+    }
 
-        if (RememberCheck.IsChecked == true)
-        {
-            var config = App.Config.GetConfig();
-            config.Settings.Mode = mode;
-            config.Settings.SkipHomeScreen = true;
-            App.Config.SaveConfig(config);
-        }
-
-        ((App)Application.Current).LaunchMode(mode);
+    private void Continue_Click(object sender, RoutedEventArgs e)
+    {
+        LaunchSelectedMode(_lastMode);
     }
 
     private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
@@ -68,8 +59,37 @@ public partial class HomeWindow : Window
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (CardsGrid == null) return;
-        CardsGrid.Columns = ActualWidth < 600 ? 1 : 3;
+        CardsGrid.Columns = ActualWidth < 700 ? 1 : ActualWidth < 1040 ? 2 : 3;
     }
+
+    private void LaunchSelectedMode(AppMode mode)
+    {
+        var config = App.Config.GetConfig();
+        config.Settings.Mode = mode;
+        config.Settings.SkipHomeScreen = false;
+        App.Config.SaveConfig(config);
+
+        ((App)Application.Current).LaunchMode(mode);
+    }
+
+    private void UpdateLastUsedUi()
+    {
+        LastUsedText.Text = $"Last used: {GetModeTitle(_lastMode)}";
+        ContinueButton.Content = $"Continue with {GetModeTitle(_lastMode)}  →";
+
+        LastUsedClassicBadge.Visibility = _lastMode == AppMode.Classic ? Visibility.Visible : Visibility.Collapsed;
+        LastUsedAgentBadge.Visibility = _lastMode == AppMode.Agent ? Visibility.Visible : Visibility.Collapsed;
+        LastUsedTeachBadge.Visibility = _lastMode == AppMode.Teach ? Visibility.Visible : Visibility.Collapsed;
+        LastUsedCaptureBadge.Visibility = _lastMode == AppMode.Capture ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static string GetModeTitle(AppMode mode) => mode switch
+    {
+        AppMode.Agent => "Reason",
+        AppMode.Teach => "Teach",
+        AppMode.Capture => "Capture",
+        _ => "Instinct"
+    };
 
     // ── Native resize for borderless window ─────────────────────────────
 

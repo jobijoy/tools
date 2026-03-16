@@ -1,0 +1,51 @@
+{
+  "$schema": "../../schemas/capture-profile-pack.schema.json",
+  "schemaVersion": 1,
+  "packId": "notepad-region-monitor",
+  "name": "Notepad Region Monitor",
+  "description": "Canonical window-region pack: open a UI, define a region inside the window, and capture only that region repeatedly.",
+  "category": "window-region-monitoring",
+  "bootstrapFlowPath": "../notepad-region-monitor-sequence.json",
+  "statusSelectors": [
+    "Window#Notepad",
+    "Document#Text Editor"
+  ],
+  "observationPlan": {
+    "triggerMode": "interval",
+    "intervalSeconds": 15,
+    "durationSeconds": 120,
+    "audioClipSeconds": 0,
+    "queueSnapshots": true,
+    "statusChangeHint": "Use visible text changes inside the editor region as the signal.",
+    "notes": "This pack demonstrates a WindowRegion target rather than full-window capture."
+  },
+  "queue": {
+    "enabled": true,
+    "queueId": "notepad-region-monitor",
+    "consumerHint": "A downstream analyzer can OCR or diff just the monitored editor region.",
+    "analysisHint": "Use region-only captures when the app chrome is noisy and the decision signal lives inside one panel."
+  },
+  "captureProfile": {
+    "id": "notepad-region-monitor",
+    "name": "Notepad Region Monitor",
+    "enabled": true,
+    "filePrefix": "notepad_region",
+    "outputDirectory": "",
+    "targets": [
+      {
+        "id": "notepad-editor-region",
+        "name": "Editor Region",
+        "kind": "WindowRegion",
+        "processName": "notepad",
+        "windowTitle": "Notepad",
+        "windowHandleHint": 0,
+        "region": {
+          "x": 0.04,
+          "y": 0.16,
+          "width": 0.92,
+          "height": 0.74
+        }
+      }
+    ]
+  }
+}

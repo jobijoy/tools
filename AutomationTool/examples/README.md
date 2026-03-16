@@ -9,6 +9,15 @@ Ready-to-run IdolClick automation flows demonstrating core actions and patterns.
 | [hello-world-click.json](hello-world-click.json) | `launch`, `click`, `assert_exists`, `send_keys` | Minimal example — open Notepad, click File menu, verify it opened |
 | [notepad-type-and-verify.json](notepad-type-and-verify.json) | `launch`, `click`, `type`, `assert_text`, `send_keys` | Type text, verify content, clean up |
 | [calculator-smoke-test.json](calculator-smoke-test.json) | `launch`, `click`, `assert_text` | Compute 2+3 in Calculator and verify the result |
+| [calculator-harness-sequence.json](calculator-harness-sequence.json) | `launch`, `send_keys`, `click`, `assert_text` | Bootstrap flow for the reusable Calculator capture pack |
+
+## Capture Packs
+
+Reusable capture packs live in [capture-profiles/](capture-profiles/). They bundle:
+
+- a reusable capture target definition
+- an optional bootstrap flow for opening and navigating the app
+- queue and downstream-analysis hints for later utilities
 
 ## How to Use
 

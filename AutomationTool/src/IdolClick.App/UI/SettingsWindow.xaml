@@ -59,7 +59,9 @@
 
             <Separator Margin="0,15"/>
 
-            <TextBlock Text="Agent (AI)" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+            <TextBlock Text="AI / Foundry" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+            <TextBlock Text="These top-level app settings are the canonical home for your model endpoint, key, and Whisper configuration. Runtime agent settings mirror them automatically for backward compatibility."
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
             
             <Label Content="LLM Endpoint" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
             <TextBox x:Name="AgentEndpointBox" Margin="0,0,0,10" 
@@ -154,9 +156,84 @@
 
             <Separator Margin="0,15"/>
 
+            <TextBlock Text="Capture Orb" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+
+            <TextBlock Text="The floating capture orb stays on top. Choose a preset corner or drag it using its handle and let the app remember the custom location."
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Label Content="Orb Placement" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <ComboBox x:Name="OrbPlacementCombo">
+                        <ComboBoxItem Content="Bottom Right" Tag="BottomRight"/>
+                        <ComboBoxItem Content="Bottom Left" Tag="BottomLeft"/>
+                        <ComboBoxItem Content="Top Right" Tag="TopRight"/>
+                        <ComboBoxItem Content="Top Left" Tag="TopLeft"/>
+                        <ComboBoxItem Content="Custom (saved drag position)" Tag="Custom"/>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Bottom">
+                    <CheckBox x:Name="RememberOrbLocationCheck" Content="Remember dragged custom position" Margin="0,24,0,0"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock x:Name="OrbConfigStatus" Text="" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+            <Separator Margin="0,15"/>
+
+            <TextBlock Text="Review Buffer" FontSize="{StaticResource FontSizeH3}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Margin="0,10,0,10"/>
+
+            <CheckBox x:Name="ReviewEnabledCheck" Content="Enable rolling review buffer" Margin="0,0,0,10"
+                      ToolTip="Continuously saves lightweight review frames in the background so the last few minutes can be exported with a hotkey."/>
+            <CheckBox x:Name="ReviewMicCheck" Content="Include microphone commentary" Margin="0,0,0,10"
+                      ToolTip="Records microphone chunks alongside the rolling review buffer."/>
+
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Label Content="Save Buffer Hotkey" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="ReviewHotkeyBox" ToolTip="Saves the last few minutes of the rolling review buffer."/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <Label Content="Buffer Duration (minutes)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="ReviewDurationBox" ToolTip="How many minutes to keep in the rolling review buffer."/>
+                </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Label Content="Frame Interval (ms)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="ReviewFrameIntervalBox" ToolTip="Lower values capture more often but cost more CPU and disk."/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <Label Content="Audio Chunk Seconds" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+                    <TextBox x:Name="ReviewAudioChunkBox" ToolTip="Length of microphone chunks stored in the rolling buffer."/>
+                </StackPanel>
+            </Grid>
+
+            <Label Content="Review Output Folder (optional)" Foreground="{StaticResource TextSecondaryBrush}" Padding="0,0,0,2"/>
+            <TextBox x:Name="ReviewOutputDirectoryBox" Margin="0,0,0,8"
+                     ToolTip="Leave empty to save review bundles under the app reports folder."/>
+
+            <TextBlock x:Name="ReviewConfigStatus" Text="" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+            <Separator Margin="0,15"/>
+
             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                 <Button Content="📂 Config Folder" Style="{StaticResource ModernButton}" Click="OpenConfigFolder_Click" Margin="0,0,10,0"/>
                 <Button Content="📋 Logs Folder" Style="{StaticResource ModernButton}" Click="OpenLogsFolder_Click"/>
+                <Button Content="🎞 Review Folder" Style="{StaticResource ModernButton}" Click="OpenReviewFolder_Click" Margin="10,0,0,0"/>
             </StackPanel>
             </StackPanel>
         </ScrollViewer>

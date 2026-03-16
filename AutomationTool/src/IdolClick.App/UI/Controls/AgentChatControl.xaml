@@ -14,6 +14,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
@@ -51,8 +52,50 @@
                     </Grid>
                 </Border>
 
+                <Border Grid.Row="1" Background="{StaticResource CardBrush}" Padding="8,6" BorderThickness="0,1,0,1" BorderBrush="{StaticResource BorderSubtleBrush}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="CapturePackPromptBox" Grid.Column="0"
+                                 FontSize="11.5" Padding="10,6"
+                                 ToolTip="Run a canonical capture pack directly from Reason. Press Enter for a smoke pass."
+                                 KeyDown="CapturePackPromptBox_KeyDown"/>
+                        <Button x:Name="RunCapturePackBtn" Grid.Column="1" Content="📸" 
+                                Style="{StaticResource SmallPrimaryButton}"
+                                Click="RunCapturePack_Click"
+                                Width="36" Height="32" Margin="6,0,0,0"
+                                ToolTip="Run prompt-driven capture pack smoke test"/>
+                        <Button x:Name="RunCapturePackFullBtn" Grid.Column="2" Content="Full" 
+                                Style="{StaticResource SmallOutlineButton}"
+                                Click="RunCapturePackFull_Click"
+                                Width="42" Height="32" Margin="6,0,0,0"
+                                ToolTip="Run full prompt-driven capture pack observation"/>
+
+                        <ItemsControl x:Name="CapturePackPromptHistoryItemsControl" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,8,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding Prompt}" Tag="{Binding}" Click="CapturePackHistoryRun_Click"
+                                            Style="{StaticResource SmallOutlineButton}" Margin="0,0,6,6" ToolTip="Click to rerun this prompt with its last mode."/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+
                 <!-- Chat Messages -->
-                <ScrollViewer x:Name="ChatScrollViewer" Grid.Row="1" 
+                <ScrollViewer x:Name="ChatScrollViewer" Grid.Row="2" 
                               VerticalScrollBarVisibility="Auto" 
                               HorizontalScrollBarVisibility="Disabled"
                               Background="{StaticResource SurfaceBrush}">
@@ -60,7 +103,7 @@
                 </ScrollViewer>
 
                 <!-- Welcome Message -->
-                <StackPanel x:Name="AgentWelcomePanel" Grid.Row="1" 
+                <StackPanel x:Name="AgentWelcomePanel" Grid.Row="2" 
                             VerticalAlignment="Center" HorizontalAlignment="Center" Margin="30">
                     <TextBlock Text="🤖" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                     <TextBlock Text="IdolClick Agent" FontSize="16" FontWeight="SemiBold" 
@@ -85,7 +128,7 @@
                 </StackPanel>
 
                 <!-- Chat Input -->
-                <Border Grid.Row="2" Background="{StaticResource CardBrush}" Padding="8" CornerRadius="0,0,6,6">
+                <Border Grid.Row="3" Background="{StaticResource CardBrush}" Padding="8" CornerRadius="0,0,6,6">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>

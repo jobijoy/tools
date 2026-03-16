@@ -15,10 +15,18 @@ public partial class AgentChatControl : UserControl
     private CancellationTokenSource? _chatCts;
     private bool _isRecordingChat;
     private LogLevel _agentLogLevel = LogLevel.Info;
+    private PromptPackHistoryService? _promptHistory;
 
     public AgentChatControl()
     {
         InitializeComponent();
+        Loaded += OnLoaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        _promptHistory ??= new PromptPackHistoryService(App.Config);
+        LoadCapturePackPromptHistory();
     }
 
     // ── Public API ────────────────────────────────────────────────────
@@ -102,6 +110,115 @@ public partial class AgentChatControl : UserControl
     private void ChatInput_TextChanged(object sender, TextChangedEventArgs e)
     {
         ChatSendBtn.IsEnabled = !string.IsNullOrWhiteSpace(ChatInputBox.Text);
+    }
+
+    private void CapturePackPromptBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            e.Handled = true;
+            _ = RunCapturePackPromptAsync(smokeMode: true);
+        }
+    }
+
+    private async void RunCapturePack_Click(object sender, RoutedEventArgs e)
+    {
+        await RunCapturePackPromptAsync(smokeMode: true);
+    }
+
+    private async void RunCapturePackFull_Click(object sender, RoutedEventArgs e)
+    {
+        await RunCapturePackPromptAsync(smokeMode: false);
+    }
+
+    private async Task RunCapturePackPromptAsync(bool smokeMode)
+    {
+        var text = CapturePackPromptBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            AddChatMessage("Enter a capture-pack prompt first.", isUser: false, isError: true);
+            return;
+        }
+
+        SetCapturePackPromptUiState(false);
+        AgentWelcomePanel.Visibility = Visibility.Collapsed;
+        AddChatMessage(text, isUser: true);
+
+        var typingBubble = AddChatMessage(
+            smokeMode ? "… resolving capture pack smoke run" : "… resolving full capture pack run",
+            isUser: false);
+
+        try
+        {
+            var orchestrator = new PromptCapturePackOrchestratorService(
+                App.Config,
+                App.Log,
+                App.Reports,
+                App.SnapCapture,
+                App.CaptureAnnotations,
+                App.FlowExecutor);
+
+            var result = await orchestrator.RunAsync(text, autoConfirm: true, smokeMode, CancellationToken.None);
+            ChatMessagesPanel.Children.Remove(typingBubble);
+
+            if (!result.Executed)
+            {
+                var failure = string.IsNullOrWhiteSpace(result.Error) ? result.Reason : result.Error;
+                AddChatMessage($"⚠ {failure}", isUser: false, isError: true);
+                return;
+            }
+
+            _promptHistory?.RecordRun(text, result, smokeMode);
+            LoadCapturePackPromptHistory();
+
+            var runKind = smokeMode ? "smoke" : "full";
+            var summary = $"📸 **{result.PackName}** {runKind} run {(result.Succeeded ? "passed" : "failed")}";
+            if (result.ResolvedInputs.Count > 0)
+                summary += $"\nInputs: {string.Join(", ", result.ResolvedInputs.Select(pair => $"{pair.Key}={pair.Value}"))}";
+            if (!string.IsNullOrWhiteSpace(result.ReportPath))
+                summary += $"\nReport: {result.ReportPath}";
+            if (!string.IsNullOrWhiteSpace(result.Error))
+                summary += $"\nMessage: {result.Error}";
+
+            AddChatMessage(summary, isUser: false, isError: !result.Succeeded);
+
+            if (result.Succeeded)
+                CapturePackPromptBox.Text = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            ChatMessagesPanel.Children.Remove(typingBubble);
+            AddChatMessage($"❌ Prompt capture pack error: {ex.Message}", isUser: false, isError: true);
+        }
+        finally
+        {
+            SetCapturePackPromptUiState(true);
+        }
+    }
+
+    private void SetCapturePackPromptUiState(bool enabled)
+    {
+        CapturePackPromptBox.IsEnabled = enabled;
+        RunCapturePackBtn.IsEnabled = enabled;
+        RunCapturePackFullBtn.IsEnabled = enabled;
+    }
+
+    private void LoadCapturePackPromptHistory()
+    {
+        var items = _promptHistory?.GetRecentEntries() ?? [];
+        CapturePackPromptHistoryItemsControl.ItemsSource = items;
+        CapturePackPromptHistoryItemsControl.Visibility = items.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private async void CapturePackHistoryRun_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not PromptPackHistoryEntry entry)
+            return;
+
+        CapturePackPromptBox.Text = entry.Prompt;
+        await RunCapturePackPromptAsync(entry.SmokeMode);
     }
 
     private async void SendChatMessage()

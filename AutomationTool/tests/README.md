@@ -28,7 +28,29 @@ Desktop-focused test suites with graduated complexity for autonomous end-to-end 
 # CLI directly
 IdolClick.exe --smoke --file tests\level-1-desktop-basic.json
 IdolClick.exe --smoke --file tests\level-2-desktop-workflows.json --log output.txt
+
+# Run the integrated capture harness demo
+.\Run-CaptureHarness.ps1
+IdolClick.exe --capture-harness
+
+# Run canonical capture-pack validations
+.\Run-YoutubeVideoMonitor.ps1
+.\Run-FinanceYahooStockMonitor.ps1 -Symbol MSFT
+.\Run-GoogleSearchMonitor.ps1 -Query "Windows UI Automation"
+.\Run-NotepadRegionMonitor.ps1
 ```
+
+## Capture Harness
+
+The Calculator capture harness is a deterministic end-to-end demo that exercises multiple IdolClick subsystems together:
+
+- launches Calculator automatically
+- creates/selects a Calculator capture profile automatically
+- enables the rolling review buffer during the run
+- drives a sequence of Calculator keypad operations
+- captures orb-equivalent snapshots after each verified result
+- injects synthetic sample voice-note WAV files into the capture annotation journal
+- writes a JSON harness report under `reports/_harness/`
 
 ## Level Details
 

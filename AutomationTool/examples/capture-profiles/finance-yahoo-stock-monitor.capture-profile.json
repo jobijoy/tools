@@ -1,0 +1,74 @@
+{
+  "$schema": "../../schemas/capture-profile-pack.schema.json",
+  "schemaVersion": 1,
+  "packId": "finance-yahoo-stock-monitor",
+  "name": "Finance Yahoo Stock Monitor",
+  "description": "Canonical finance-monitoring pack: open Yahoo Finance on a specific stock quote page and capture repeated price snapshots for downstream analysis.",
+  "category": "finance-monitoring",
+  "bootstrapFlowPath": "../finance-yahoo-stock-bootstrap.json",
+  "inputs": [
+    {
+      "name": "symbol",
+      "description": "Ticker symbol to monitor on Yahoo Finance.",
+      "required": true,
+      "defaultValue": "AAPL",
+      "example": "MSFT"
+    }
+  ],
+  "statusProbes": [
+    {
+      "name": "quote-window-title",
+      "kind": "WindowTitle",
+      "contains": "{{symbol}}",
+      "required": true,
+      "useForChangeDetection": true
+    },
+    {
+      "name": "symbol-badge",
+      "kind": "SelectorValue",
+      "selector": "Text#{{symbol}}",
+      "equals": "{{symbol}}",
+      "required": true,
+      "useForChangeDetection": true
+    },
+    {
+      "name": "yahoo-brand-link",
+      "kind": "SelectorExists",
+      "selector": "Document#Yahoo Finance",
+      "required": false,
+      "useForChangeDetection": false
+    }
+  ],
+  "observationPlan": {
+    "triggerMode": "interval",
+    "intervalSeconds": 20,
+    "durationSeconds": 180,
+    "audioClipSeconds": 0,
+    "queueSnapshots": true,
+    "statusChangeHint": "Track quote updates, price movement, and visible chart state as the observation heartbeat.",
+    "notes": "Use this as the finance website replacement for the previous Teams canonical example. Pass a symbol input to monitor another ticker."
+  },
+  "queue": {
+    "enabled": true,
+    "queueId": "finance-yahoo-stock-monitor",
+    "consumerHint": "A downstream analyzer can inspect quote snapshots and metadata for price changes or chart movement.",
+    "analysisHint": "Treat each snapshot as a quote checkpoint and compare recent captures to infer trend or trigger decisions."
+  },
+  "captureProfile": {
+    "id": "finance-yahoo-stock-monitor",
+    "name": "Finance Yahoo Stock Monitor",
+    "enabled": true,
+    "filePrefix": "yahoo_quote",
+    "outputDirectory": "",
+    "targets": [
+      {
+        "id": "finance-yahoo-window",
+        "name": "Yahoo Finance Quote Window",
+        "kind": "Window",
+        "processName": "msedge",
+        "windowTitle": "{{symbol}}",
+        "windowHandleHint": 0
+      }
+    ]
+  }
+}

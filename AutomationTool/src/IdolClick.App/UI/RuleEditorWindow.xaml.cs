@@ -172,9 +172,11 @@ public partial class RuleEditorWindow : Window
             if (region != null)
             {
                 // Get virtual screen dimensions for normalization (supports multi-monitor)
+                var screenLeft = (int)SystemParameters.VirtualScreenLeft;
+                var screenTop = (int)SystemParameters.VirtualScreenTop;
                 var screenWidth = (int)SystemParameters.VirtualScreenWidth;
                 var screenHeight = (int)SystemParameters.VirtualScreenHeight;
-                var normalized = region.ToScreenNormalized(screenWidth, screenHeight);
+                var normalized = region.ToScreenNormalized(screenWidth, screenHeight, screenLeft, screenTop);
                 RegionXBox.Text = normalized.X.ToString("0.####");
                 RegionYBox.Text = normalized.Y.ToString("0.####");
                 RegionWidthBox.Text = normalized.Width.ToString("0.####");

@@ -1,0 +1,73 @@
+{
+  "$schema": "../../schemas/capture-profile-pack.schema.json",
+  "schemaVersion": 1,
+  "packId": "google-search-monitor",
+  "name": "Google Search Monitor",
+  "description": "Canonical website-navigation pack: open Google search results for a specific query and capture repeated result-page snapshots.",
+  "category": "browser-monitoring",
+  "bootstrapFlowPath": "../google-search-monitor-bootstrap.json",
+  "inputs": [
+    {
+      "name": "query",
+      "description": "Human-readable Google query.",
+      "required": true,
+      "defaultValue": "IdolClick automation",
+      "example": "Windows UI Automation"
+    },
+    {
+      "name": "queryEncoded",
+      "description": "URL-encoded Google query string.",
+      "required": true,
+      "defaultValue": "IdolClick%20automation",
+      "example": "Windows%20UI%20Automation"
+    }
+  ],
+  "statusProbes": [
+    {
+      "name": "google-window-title",
+      "kind": "WindowTitle",
+      "contains": "{{query}}",
+      "required": true,
+      "useForChangeDetection": true
+    },
+    {
+      "name": "google-search-box",
+      "kind": "SelectorExists",
+      "selector": "Edit#APjFqb",
+      "required": false,
+      "useForChangeDetection": false
+    }
+  ],
+  "observationPlan": {
+    "triggerMode": "interval",
+    "intervalSeconds": 20,
+    "durationSeconds": 120,
+    "audioClipSeconds": 0,
+    "queueSnapshots": true,
+    "statusChangeHint": "Use query/result-page changes as the monitoring signal.",
+    "notes": "This is the generic website-navigation example that complements the finance.yahoo monitor. Pass a query input to run a different search without editing JSON."
+  },
+  "queue": {
+    "enabled": true,
+    "queueId": "google-search-monitor",
+    "consumerHint": "A downstream analyzer can summarize top results or diff result pages over time.",
+    "analysisHint": "Treat each capture as a search-state checkpoint and compare titles/snippets across runs."
+  },
+  "captureProfile": {
+    "id": "google-search-monitor",
+    "name": "Google Search Monitor",
+    "enabled": true,
+    "filePrefix": "google_search",
+    "outputDirectory": "",
+    "targets": [
+      {
+        "id": "google-search-window",
+        "name": "Google Search Window",
+        "kind": "Window",
+        "processName": "msedge",
+        "windowTitle": "Google",
+        "windowHandleHint": 0
+      }
+    ]
+  }
+}

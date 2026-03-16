@@ -112,6 +112,7 @@ public sealed class ApiHostService : IDisposable
 
         // ── Map endpoints ───────────────────────────────────────────────────
         FlowEndpoints.Map(_app);
+        CaptureEndpoints.Map(_app);
         AgentEndpoints.Map(_app);
         TemplateEndpoints.Map(_app);
         ToolEndpoints.Map(_app);

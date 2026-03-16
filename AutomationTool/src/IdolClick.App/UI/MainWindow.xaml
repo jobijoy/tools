@@ -65,6 +65,12 @@
                              ToolTip="🎓 Teach — Smart Sentence Builder">
                     <TextBlock Text="🎓" FontSize="17"/>
                 </RadioButton>
+                <RadioButton x:Name="NavCapture" Tag="Capture"
+                             Style="{StaticResource ActivityBarItem}"
+                             Click="NavMode_Click"
+                             ToolTip="📸 Capture — reusable visual snapshots">
+                    <TextBlock Text="📸" FontSize="17"/>
+                </RadioButton>
 
                 <Button Content="⚙" Width="48" Height="36"
                         Style="{StaticResource IconButton}"
@@ -158,6 +164,12 @@
         <Border x:Name="TeachPanelBorder" Grid.Column="2" Grid.Row="2"
                 Visibility="Collapsed" Margin="6,6,6,6" CornerRadius="6">
             <ctrl:TeachPanelControl x:Name="TeachPanel"/>
+        </Border>
+
+        <!-- ═══ Capture Panel (Capture — Col 2, Row 2) ═══ -->
+        <Border x:Name="CapturePanelBorder" Grid.Column="2" Grid.Row="2"
+                Visibility="Collapsed" Margin="6,6,6,6" CornerRadius="6">
+            <ctrl:CapturePanelControl x:Name="CapturePanel"/>
         </Border>
 
         <!-- ═══ Right GridSplitter (Classic mode) ═══ -->

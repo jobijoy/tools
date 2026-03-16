@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "testName": "Notepad Region Monitor Bootstrap",
+  "description": "Open Notepad, type a few lines, and leave the window ready for repeated region captures.",
+  "targetApp": "notepad",
+  "stopOnFailure": true,
+  "timeoutSeconds": 60,
+  "steps": [
+    {
+      "order": 1,
+      "action": "launch",
+      "processPath": "notepad.exe",
+      "description": "Launch Notepad",
+      "timeoutMs": 5000,
+      "delayAfterMs": 1500
+    },
+    {
+      "order": 2,
+      "action": "type",
+      "app": "notepad",
+      "text": "Region monitor demo\r\nStatus: collecting frames\r\nQueue: enabled",
+      "description": "Seed the editor with visible changing content",
+      "delayAfterMs": 500
+    }
+  ]
+}

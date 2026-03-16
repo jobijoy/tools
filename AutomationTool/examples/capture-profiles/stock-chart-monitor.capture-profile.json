@@ -1,0 +1,37 @@
+{
+  "$schema": "../../schemas/capture-profile-pack.schema.json",
+  "schemaVersion": 1,
+  "packId": "stock-chart-monitor-template",
+  "name": "Stock Chart Monitor Template",
+  "description": "Template pack for an app that opens a charting workspace, navigates to a symbol, captures repeated chart states, and queues them for another utility to analyze.",
+  "category": "monitoring-template",
+  "bootstrapFlowPath": "../hello-world-click.json",
+  "statusSelectors": [
+    "Window#<Your charting app title>",
+    "Text#<Price readout automation id>",
+    "Text#<Symbol readout automation id>"
+  ],
+  "queue": {
+    "enabled": true,
+    "queueId": "chart-monitoring",
+    "consumerHint": "Another utility can poll /api/captures/recent and /api/captures/timeline for the latest frames and notes.",
+    "analysisHint": "Treat price-panel and chart changes as decision inputs. Use capture batches plus annotations to drive downstream strategy evaluation."
+  },
+  "captureProfile": {
+    "id": "stock-chart-monitor-template",
+    "name": "Stock Chart Monitor",
+    "enabled": true,
+    "filePrefix": "chart_watch",
+    "outputDirectory": "",
+    "targets": [
+      {
+        "id": "chart-main-window",
+        "name": "Chart Window",
+        "kind": "Window",
+        "processName": "<YourProcessName>",
+        "windowTitle": "<Your chart window title>",
+        "windowHandleHint": 0
+      }
+    ]
+  }
+}

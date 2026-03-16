@@ -44,6 +44,9 @@ public class RegionCaptureService : IRegionCaptureService
 
     public async Task<CapturedRegion?> CaptureRegionForWindowAsync(IntPtr windowHandle)
     {
+        if (windowHandle == IntPtr.Zero)
+            return await CaptureRegionAsync();
+
         // Get window bounds
         if (!GetWindowRect(windowHandle, out var rect))
         {
@@ -51,14 +54,30 @@ public class RegionCaptureService : IRegionCaptureService
             return await CaptureRegionAsync();
         }
 
+        await Application.Current.Dispatcher.InvokeAsync(() => Win32.ForceActivateWindow(windowHandle));
+        await Task.Delay(150);
+
         var captured = await CaptureRegionAsync();
         if (captured == null) return null;
 
-        // Adjust coordinates relative to window
-        captured.X -= rect.Left;
-        captured.Y -= rect.Top;
+        var absoluteLeft = Math.Max(captured.X, rect.Left);
+        var absoluteTop = Math.Max(captured.Y, rect.Top);
+        var absoluteRight = Math.Min(captured.X + captured.Width, rect.Right);
+        var absoluteBottom = Math.Min(captured.Y + captured.Height, rect.Bottom);
 
-        return captured;
+        if (absoluteRight <= absoluteLeft || absoluteBottom <= absoluteTop)
+        {
+            _log.Warn("RegionCapture", "Selected region did not intersect the target window");
+            return null;
+        }
+
+        return new CapturedRegion
+        {
+            X = absoluteLeft - rect.Left,
+            Y = absoluteTop - rect.Top,
+            Width = absoluteRight - absoluteLeft,
+            Height = absoluteBottom - absoluteTop
+        };
     }
 
     [DllImport("user32.dll")]

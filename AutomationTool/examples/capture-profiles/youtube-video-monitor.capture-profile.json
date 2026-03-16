@@ -1,0 +1,57 @@
+{
+  "$schema": "../../schemas/capture-profile-pack.schema.json",
+  "schemaVersion": 1,
+  "packId": "youtube-video-monitor",
+  "name": "YouTube Video Monitor",
+  "description": "Canonical browser-monitoring pack: open a YouTube video, keep it playing, take screenshots every 30 seconds for 3 minutes, and attach a short 5-second audio note to each checkpoint.",
+  "category": "browser-monitoring",
+  "bootstrapFlowPath": "../youtube-video-monitor-sequence.json",
+  "statusProbes": [
+    {
+      "name": "youtube-window-title",
+      "kind": "WindowTitle",
+      "contains": "YouTube",
+      "required": true,
+      "useForChangeDetection": true
+    },
+    {
+      "name": "youtube-video-surface",
+      "kind": "SelectorExists",
+      "selector": "Group#video",
+      "required": false,
+      "useForChangeDetection": false
+    }
+  ],
+  "observationPlan": {
+    "triggerMode": "interval",
+    "intervalSeconds": 30,
+    "durationSeconds": 180,
+    "audioClipSeconds": 5,
+    "queueSnapshots": true,
+    "statusChangeHint": "Use playback progress and player state changes as the observation heartbeat.",
+    "notes": "Best used with the orb interval mode or a future scheduler that consumes pack metadata."
+  },
+  "queue": {
+    "enabled": true,
+    "queueId": "youtube-video-monitor",
+    "consumerHint": "A downstream analyzer can inspect each frame for scene changes, captions, or overlay states.",
+    "analysisHint": "Treat each 30-second frame as a checkpoint and correlate it with the 5-second audio note captured around that moment."
+  },
+  "captureProfile": {
+    "id": "youtube-video-monitor",
+    "name": "YouTube Video Monitor",
+    "enabled": true,
+    "filePrefix": "yt_watch",
+    "outputDirectory": "",
+    "targets": [
+      {
+        "id": "youtube-edge-window",
+        "name": "Edge YouTube Window",
+        "kind": "Window",
+        "processName": "msedge",
+        "windowTitle": "YouTube",
+        "windowHandleHint": 0
+      }
+    ]
+  }
+}

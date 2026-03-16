@@ -16,10 +16,12 @@ public partial class MainWindow : Window
     private LogLevel _logLevel = LogLevel.Debug;
     private bool _isExpanded = true;  // default true at 1060px initial width
     private AppMode _currentMode = AppMode.Classic;
+    private SnapOrbWindow? _snapOrbWindow;
 
     public MainWindow()
     {
         InitializeComponent();
+        Loaded += (_, _) => UpdateSnapOrbVisibility();
         SetupKeyboardShortcuts();
 
         // Wire UserControl events
@@ -51,6 +53,15 @@ public partial class MainWindow : Window
         // Global profile-changed (from service level)
         App.Profiles.ProfileChanged += OnProfileChanged;
         App.Hotkey.SetMainWindow(this);
+        App.Hotkey.OnCaptureRequested += () => Dispatcher.BeginInvoke(async () =>
+        {
+            var result = await App.SnapCapture.CaptureSelectedProfileAsync();
+            if (result != null)
+                CapturePanel.LoadProfiles();
+        });
+        App.Hotkey.OnCaptureAnnotationPressed += () => Dispatcher.BeginInvoke(() => App.CaptureAnnotations.StartPushToTalk());
+        App.Hotkey.OnCaptureAnnotationReleased += () => Dispatcher.BeginInvoke(async () => await App.CaptureAnnotations.StopPushToTalkAsync());
+        App.Hotkey.OnReviewBufferSaveRequested += () => Dispatcher.BeginInvoke(async () => await App.ReviewBuffer.SaveBufferAsync());
     }
 
     // ═══ Keyboard shortcuts ═══
@@ -96,6 +107,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
+        _snapOrbWindow?.Close();
         App.Profiles.SaveCurrentProfile();
         Application.Current.Shutdown();
     }
@@ -220,6 +232,7 @@ public partial class MainWindow : Window
             {
                 "Agent" => AppMode.Agent,
                 "Teach" => AppMode.Teach,
+                "Capture" => AppMode.Capture,
                 _ => AppMode.Classic
             };
             SwitchMode(mode);
@@ -245,6 +258,7 @@ public partial class MainWindow : Window
         RulesPanelBorder.Visibility = _currentMode == AppMode.Classic ? Visibility.Visible : Visibility.Collapsed;
         AgentChatPanel.Visibility = _currentMode == AppMode.Agent ? Visibility.Visible : Visibility.Collapsed;
         TeachPanelBorder.Visibility = _currentMode == AppMode.Teach ? Visibility.Visible : Visibility.Collapsed;
+        CapturePanelBorder.Visibility = _currentMode == AppMode.Capture ? Visibility.Visible : Visibility.Collapsed;
 
         // Profile pane + controls: Classic only
         bool isClassic = _currentMode == AppMode.Classic;
@@ -268,12 +282,14 @@ public partial class MainWindow : Window
         {
             AppMode.Agent => ("🧠", "Reason", "AI Agent — describe tasks in plain English"),
             AppMode.Teach => ("🎓", "Teach", "Smart Sentence Builder"),
+            AppMode.Capture => ("📸", "Capture", "Reusable window and region snapshots"),
             _ => ("⚡", "Instinct", "Rule-based automation with profiles and rules")
         };
         SectionAccent.Background = _currentMode switch
         {
             AppMode.Agent => (System.Windows.Media.Brush)FindResource("AccentBrush"),
             AppMode.Teach => (System.Windows.Media.Brush)FindResource("PrimaryLightBrush"),
+            AppMode.Capture => (System.Windows.Media.Brush)FindResource("SuccessBrush"),
             _ => (System.Windows.Media.Brush)FindResource("PrimaryBrush")
         };
 
@@ -281,6 +297,7 @@ public partial class MainWindow : Window
         NavClassic.IsChecked = _currentMode == AppMode.Classic;
         NavAgent.IsChecked = _currentMode == AppMode.Agent;
         NavTeach.IsChecked = _currentMode == AppMode.Teach;
+        NavCapture.IsChecked = _currentMode == AppMode.Capture;
 
         if (_currentMode == AppMode.Agent)
         {
@@ -289,8 +306,51 @@ public partial class MainWindow : Window
         }
         if (_currentMode == AppMode.Teach)
             TeachPanel.UpdateMicButtonVisibility();
+        if (_currentMode == AppMode.Capture)
+            CapturePanel.LoadProfiles();
+
+        UpdateSnapOrbVisibility();
 
         ResizeColumns();
+    }
+
+    private void UpdateSnapOrbVisibility()
+    {
+        if (!IsLoaded || !IsVisible)
+            return;
+
+        if (_currentMode == AppMode.Capture)
+        {
+            EnsureSnapOrbWindow();
+            if (_snapOrbWindow != null && !_snapOrbWindow.IsVisible)
+                _snapOrbWindow.Show();
+        }
+        else if (_snapOrbWindow != null && _snapOrbWindow.IsVisible)
+        {
+            _snapOrbWindow.Hide();
+        }
+    }
+
+    private void EnsureSnapOrbWindow()
+    {
+        if (_snapOrbWindow != null)
+            return;
+
+        _snapOrbWindow = new SnapOrbWindow();
+        if (IsLoaded && IsVisible)
+            _snapOrbWindow.Owner = this;
+        _snapOrbWindow.Closed += (_, _) => _snapOrbWindow = null;
+    }
+
+    public void FocusSnapOrb()
+    {
+        EnsureSnapOrbWindow();
+        _snapOrbWindow?.FocusOrb();
+    }
+
+    public void RefreshSnapOrbPlacement()
+    {
+        _snapOrbWindow?.ReloadPlacement();
     }
 
     // ═══ Log subscription ═══
@@ -483,7 +543,12 @@ public partial class MainWindow : Window
 
 public class RelayCommand(Action<object?> execute) : ICommand
 {
-    public event EventHandler? CanExecuteChanged;
+    public event EventHandler? CanExecuteChanged
+    {
+        add => CommandManager.RequerySuggested += value;
+        remove => CommandManager.RequerySuggested -= value;
+    }
+
     public bool CanExecute(object? parameter) => true;
     public void Execute(object? parameter) => execute(parameter);
 }

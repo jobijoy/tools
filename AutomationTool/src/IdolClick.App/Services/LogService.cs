@@ -65,7 +65,7 @@ public class LogService : IDisposable
     {
         var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
         Directory.CreateDirectory(logDir);
-        _logPath = Path.Combine(logDir, $"log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+        _logPath = Path.Combine(logDir, $"log_{DateTime.Now:yyyyMMdd_HHmmss_fff}.txt");
         _auditPath = Path.Combine(logDir, "audit_log.txt");
         
         // Open persistent writer with auto-flush disabled (we flush on timer + dispose)

@@ -1,0 +1,36 @@
+{
+  "$schema": "../../schemas/capture-profile-pack.schema.json",
+  "schemaVersion": 1,
+  "packId": "calculator-harness",
+  "name": "Calculator Harness Capture Pack",
+  "description": "Reusable Calculator capture profile with a bootstrap flow and queue metadata. Intended for repeated observation runs and downstream analysis pipelines.",
+  "category": "desktop-demo",
+  "bootstrapFlowPath": "../calculator-harness-sequence.json",
+  "statusSelectors": [
+    "Text#CalculatorResults",
+    "Button#equalButton"
+  ],
+  "queue": {
+    "enabled": true,
+    "queueId": "calculator-checkpoints",
+    "consumerHint": "Downstream analyzer can consume recent capture events and annotation timeline entries.",
+    "analysisHint": "Use display changes in CalculatorResults as status transitions and inspect the latest capture preview for decision-making."
+  },
+  "captureProfile": {
+    "id": "capture-harness-calculator",
+    "name": "Calculator Harness",
+    "enabled": true,
+    "filePrefix": "calc_harness",
+    "outputDirectory": "",
+    "targets": [
+      {
+        "id": "calc-main-window",
+        "name": "Calculator Main Window",
+        "kind": "Window",
+        "processName": "CalculatorApp",
+        "windowTitle": "Calculator",
+        "windowHandleHint": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,299 @@
+<Window x:Class="IdolClick.UI.SnapOrbWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="IdolClick Capture Orb"
+        Width="560" Height="188"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        ShowActivated="False"
+        MouseEnter="Window_MouseEnter"
+        MouseLeave="Window_MouseLeave">
+
+    <Window.Resources>
+        <Style x:Key="OrbViewToggle" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CaptureWorkspaceCardEdgeBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource CaptureWorkspaceHeaderBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource WorkspaceCaptureBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource CaptureWorkspaceHeaderBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GalleryTileItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,10,10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Card" Style="{StaticResource CaptureTileBorder}" Width="132" Height="132" RenderTransformOrigin="0.5,0.5">
+                            <Grid ClipToBounds="True">
+                                <Image Source="{Binding PreviewImage}" Stretch="UniformToFill"/>
+                                <Rectangle Fill="{StaticResource SurfaceTintBrush}" Opacity="0.45"/>
+                                <Border x:Name="OverlayPanel" Background="{StaticResource CaptureTileOverlayBrush}" VerticalAlignment="Bottom" Padding="8,7" CornerRadius="0,0,14,14">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding ProfileName}" Foreground="White" FontFamily="{StaticResource HeadingFont}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding TimeLabel}" Foreground="#D9FFFFFF" FontSize="10.5" Margin="0,3,0,0" FontFamily="{StaticResource AppFont}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource SuccessBrush}"/>
+                                <Setter TargetName="Card" Property="BorderThickness" Value="1.5"/>
+                                <Setter TargetName="OverlayPanel" Property="Background" Value="{StaticResource CaptureTileHoverOverlayBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="PanelColumn" Width="0"/>
+            <ColumnDefinition Width="116"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="1" Margin="12" Background="{StaticResource OrbShellBrush}" CornerRadius="42" BorderBrush="{StaticResource CaptureOrbBorderBrush}" BorderThickness="1.4">
+            <Grid>
+                <Grid.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="6" Opacity="0.58" Color="{StaticResource ShadowAccentColor}"/>
+                </Grid.Effect>
+
+                <Ellipse Width="88" Height="88" HorizontalAlignment="Center" VerticalAlignment="Center" Fill="{StaticResource OrbHaloBrush}" Opacity="0.45" IsHitTestVisible="False"/>
+
+                <Ellipse Width="78" Height="78" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="{StaticResource CaptureOrbRingBrush}" StrokeThickness="1.6">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush RadiusX="0.8" RadiusY="0.8" Center="0.5,0.45">
+                            <GradientStop Color="#38FFFFFF" Offset="0"/>
+                            <GradientStop Color="#08FFFFFF" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="OuterRingScale" ScaleX="1" ScaleY="1" CenterX="39" CenterY="39"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="62" Height="62" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="{StaticResource WorkspaceCaptureBrush}" StrokeThickness="1.3">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush RadiusX="0.85" RadiusY="0.85" Center="0.5,0.42">
+                            <GradientStop Color="#55FFFFFF" Offset="0"/>
+                            <GradientStop Color="#0F0F8CEE" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="InnerRingScale" ScaleX="1" ScaleY="1" CenterX="31" CenterY="31"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+
+                <Button x:Name="OrbButton" Width="74" Height="74" Click="OrbButton_Click" PreviewMouseLeftButtonDown="OrbButton_PreviewMouseLeftButtonDown"
+                        Background="Transparent" BorderThickness="0" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="OrbShell" BorderBrush="{StaticResource CaptureOrbBorderBrush}" BorderThickness="1.8" CornerRadius="37">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#FF0F1820" Offset="0"/>
+                                        <GradientStop Color="#FF16222B" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Grid>
+                                    <Ellipse Width="54" Height="22" Fill="#35FFFFFF" VerticalAlignment="Top" Margin="0,10,0,0" IsHitTestVisible="False"/>
+                                    <Border Width="56" Height="56" CornerRadius="28" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Border.Background>
+                                            <RadialGradientBrush RadiusX="0.85" RadiusY="0.85" Center="0.45,0.35">
+                                                <GradientStop Color="#FF79D7FF" Offset="0"/>
+                                                <GradientStop Color="{StaticResource OrbCoreColor}" Offset="0.55"/>
+                                                <GradientStop Color="{StaticResource OrbCoreAccentColor}" Offset="1"/>
+                                            </RadialGradientBrush>
+                                        </Border.Background>
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="32" ShadowDepth="0" Opacity="0.66" Color="{StaticResource ShadowSuccessColor}"/>
+                                        </Border.Effect>
+                                    </Border>
+                                    <Ellipse Width="18" Height="18" Fill="{StaticResource OrbSparkBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,15,17,0" Opacity="0.82" IsHitTestVisible="False"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="OrbShell" Property="BorderBrush" Value="White"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+                <TextBlock x:Name="OrbGlyphText" Text="◎" Foreground="White" FontFamily="{StaticResource HeadingFont}" FontSize="22" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+
+                <Thumb x:Name="DragThumb" Width="42" Height="18" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0"
+                       Cursor="SizeAll" DragDelta="DragThumb_DragDelta" DragCompleted="DragThumb_DragCompleted">
+                    <Thumb.Template>
+                        <ControlTemplate TargetType="Thumb">
+                            <Border Background="#20000000" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="9" Padding="8,4">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Ellipse Width="4" Height="4" Fill="#CCFFFFFF" Margin="0,0,3,0"/>
+                                    <Ellipse Width="4" Height="4" Fill="#CCFFFFFF" Margin="0,0,3,0"/>
+                                    <Ellipse Width="4" Height="4" Fill="#CCFFFFFF"/>
+                                </StackPanel>
+                            </Border>
+                        </ControlTemplate>
+                    </Thumb.Template>
+                </Thumb>
+
+                <Button x:Name="AnnotationButton" Width="28" Height="28" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0"
+                        Content="🎤" Style="{StaticResource MicButton}" Visibility="Collapsed"
+                        PreviewMouseLeftButtonDown="AnnotationButton_PreviewMouseLeftButtonDown"
+                        PreviewMouseLeftButtonUp="AnnotationButton_PreviewMouseLeftButtonUp"
+                        MouseLeave="AnnotationButton_MouseLeave"
+                        ToolTip="Hold to record a voice note"/>
+
+                <StackPanel VerticalAlignment="Bottom" Margin="10,0,10,10">
+                    <Border HorizontalAlignment="Center" Background="#1BFFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="9" Padding="8,2" Margin="0,0,0,6">
+                        <TextBlock Text="SNAP" Foreground="White" FontSize="9.5" FontWeight="SemiBold"/>
+                    </Border>
+                    <TextBlock x:Name="OrbStatusTitle" Text="Ready" Foreground="White" FontFamily="{StaticResource HeadingFont}" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="OrbStatusSubtitle" Text="Hover to open gallery" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border x:Name="GalleryPanel" Grid.Column="0" Margin="12,12,0,12" CornerRadius="24" BorderBrush="{StaticResource CaptureWorkspaceCardEdgeBrush}" BorderThickness="1.4"
+                Background="{StaticResource WindowGlassBrush}" Opacity="0" ClipToBounds="True">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.32" Color="{StaticResource CaptureWorkspaceShadowColor}"/>
+            </Border.Effect>
+            <Grid Width="428">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Padding="16,14" BorderBrush="{StaticResource CaptureWorkspaceCardEdgeBrush}" BorderThickness="0,0,0,1">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#FF202A33" Offset="0"/>
+                            <GradientStop Color="#FF182027" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="Capture stream" Foreground="White" FontFamily="{StaticResource HeadingFont}" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="ActiveProfileText" Text="No active profile" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" Margin="0,3,0,0"/>
+                            <TextBlock x:Name="LastAnnotationText" Text="Hold the mic to add a timestamped voice note." Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ToggleButton x:Name="TilesToggle" Style="{StaticResource OrbViewToggle}" Content="Tiles" IsChecked="True" Checked="ViewToggle_Checked"/>
+                            <ToggleButton x:Name="TimelineToggle" Style="{StaticResource OrbViewToggle}" Content="Timeline" Margin="6,0,0,0" Checked="ViewToggle_Checked"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1" Margin="12,10,12,0" Style="{StaticResource CaptureTileBorder}" Padding="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="92"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="HoverCaptureButton" Content="Capture now" Style="{StaticResource SmallPrimaryButton}" Click="HoverCaptureButton_Click" Padding="10,5"/>
+                        <Button x:Name="HoverTalkButton" Grid.Column="1" Content="Hold to talk" Style="{StaticResource SmallOutlineButton}" Margin="8,0,0,0"
+                                PreviewMouseLeftButtonDown="HoverTalkButton_PreviewMouseLeftButtonDown"
+                                PreviewMouseLeftButtonUp="HoverTalkButton_PreviewMouseLeftButtonUp"
+                                MouseLeave="HoverTalkButton_MouseLeave"/>
+
+                        <ToggleButton x:Name="IntervalCaptureToggle" Grid.Column="3" Content="Interval" Style="{StaticResource OrbViewToggle}" Checked="IntervalCaptureToggle_Changed" Unchecked="IntervalCaptureToggle_Changed"/>
+                        <ComboBox x:Name="IntervalCaptureComboBox" Grid.Column="4" Margin="8,0,0,0" VerticalAlignment="Center" SelectionChanged="IntervalCaptureComboBox_SelectionChanged">
+                            <ComboBoxItem Content="5 sec" Tag="5"/>
+                            <ComboBoxItem Content="10 sec" Tag="10"/>
+                            <ComboBoxItem Content="15 sec" Tag="15"/>
+                            <ComboBoxItem Content="30 sec" Tag="30"/>
+                            <ComboBoxItem Content="60 sec" Tag="60"/>
+                        </ComboBox>
+                        <TextBlock x:Name="IntervalStatusText" Grid.Column="5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="2" Margin="12,10,12,12">
+                    <ScrollViewer x:Name="TilesScrollViewer" VerticalScrollBarVisibility="Auto">
+                        <ListBox x:Name="TilesListBox" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource GalleryTileItemStyle}"
+                                 MouseDoubleClick="CaptureItem_DoubleClick" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionMode="Single">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                        </ListBox>
+                    </ScrollViewer>
+
+                    <ListView x:Name="TimelineListView" Visibility="Collapsed" Background="Transparent" BorderThickness="0" MouseDoubleClick="CaptureItem_DoubleClick">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource CaptureTimelineCardBrush}" BorderBrush="{StaticResource CaptureWorkspaceCardEdgeBrush}" BorderThickness="1.2" CornerRadius="16" Padding="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="88"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" CornerRadius="10" ClipToBounds="True" Background="{StaticResource SurfaceTintBrush}" Height="72" Width="84">
+                                            <Image Source="{Binding PreviewImage}" Stretch="UniformToFill"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding ProfileName}" Foreground="White" FontFamily="{StaticResource HeadingFont}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding TimeLabel}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding Summary}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

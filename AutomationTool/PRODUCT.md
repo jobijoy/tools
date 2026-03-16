@@ -501,6 +501,7 @@ The agent interaction is **spec-driven, not chat-driven**. The LLM uses `Validat
 
 | Document | Audience | Content |
 |----------|----------|---------|
+| [CURRENT-STATE.md](CURRENT-STATE.md) | Everyone | Current validated status, mode maturity, known risks, and verification commands |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Agents & architects | Full architecture reference: layers, data flow, component inventory, dependency graph |
 | [AGENTS-GUIDE.md](AGENTS-GUIDE.md) | Coding agents | Practical how-to: conventions, common tasks, gotchas, build instructions |
 | [CHANGELOG.md](CHANGELOG.md) | Everyone | Version history and release notes |

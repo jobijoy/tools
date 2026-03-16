@@ -30,9 +30,15 @@ public class ReportService
     private readonly LogService _log;
     private readonly string _reportsDir;
 
-    public ReportService(LogService log)
+    public ReportService(LogService log, string? reportsDirectory = null)
     {
         _log = log ?? throw new ArgumentNullException(nameof(log));
+
+        if (!string.IsNullOrWhiteSpace(reportsDirectory))
+        {
+            _reportsDir = reportsDirectory;
+            return;
+        }
 
         var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
         var appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
@@ -78,19 +84,51 @@ public class ReportService
     /// </summary>
     public string? CaptureScreenshot(string? outputDir = null, string? fileName = null)
     {
+        var left = (int)SystemParameters.VirtualScreenLeft;
+        var top = (int)SystemParameters.VirtualScreenTop;
+        var width = (int)SystemParameters.VirtualScreenWidth;
+        var height = (int)SystemParameters.VirtualScreenHeight;
+
+        return CaptureAreaScreenshot(left, top, width, height, outputDir, fileName, "screenshot");
+    }
+
+    /// <summary>
+    /// Captures a screenshot of a specific screen region.
+    /// Returns the file path, or null on failure.
+    /// </summary>
+    public string? CaptureRegionScreenshot(CapturedRegion region, string? outputDir = null, string? fileName = null)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+        return CaptureAreaScreenshot(region.X, region.Y, region.Width, region.Height, outputDir, fileName, "region");
+    }
+
+    /// <summary>
+    /// Captures the bounds of a specific top-level window.
+    /// Returns the file path, or null on failure.
+    /// </summary>
+    public string? CaptureWindowScreenshot(IntPtr windowHandle, string? outputDir = null, string? fileName = null)
+    {
+        if (windowHandle == IntPtr.Zero)
+            return null;
+
+        if (!GetWindowRect(windowHandle, out var rect))
+            return null;
+
+        return CaptureAreaScreenshot(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top, outputDir, fileName, "window");
+    }
+
+    private string? CaptureAreaScreenshot(int left, int top, int width, int height, string? outputDir, string? fileName, string defaultPrefix)
+    {
         try
         {
+            if (width <= 0 || height <= 0)
+                return null;
+
             var dir = outputDir ?? Path.Combine(_reportsDir, "_screenshots");
             Directory.CreateDirectory(dir);
 
-            var file = fileName ?? $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png";
+            var file = fileName ?? $"{defaultPrefix}_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png";
             var path = Path.Combine(dir, file);
-
-            // Get virtual screen bounds (all monitors)
-            var left = (int)SystemParameters.VirtualScreenLeft;
-            var top = (int)SystemParameters.VirtualScreenTop;
-            var width = (int)SystemParameters.VirtualScreenWidth;
-            var height = (int)SystemParameters.VirtualScreenHeight;
 
             // Capture using GDI via Win32
             var hdcScreen = GetDC(IntPtr.Zero);
@@ -131,12 +169,22 @@ public class ReportService
 
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int w, int h);
     [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
     [DllImport("gdi32.dll")] private static extern bool BitBlt(IntPtr hdcDest, int x, int y, int w, int h, IntPtr hdcSrc, int x1, int y1, int rop);
     [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr hObject);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 
     /// <summary>
     /// Captures a screenshot for a specific step during flow execution.

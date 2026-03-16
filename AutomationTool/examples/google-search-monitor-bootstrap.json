@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "testName": "Google Search Monitor Bootstrap",
+  "description": "Open Edge to a Google search results page for {{query}} and leave the results visible for repeated monitoring captures.",
+  "targetApp": "msedge",
+  "stopOnFailure": true,
+  "timeoutSeconds": 75,
+  "steps": [
+    {
+      "order": 1,
+      "action": "navigate",
+      "app": "msedge",
+      "url": "https://www.google.com/search?q={{queryEncoded}}",
+      "description": "Open Google search results for {{query}} in Edge",
+      "timeoutMs": 15000,
+      "delayAfterMs": 4000
+    },
+    {
+      "order": 2,
+      "action": "focus_window",
+      "app": "msedge",
+      "windowTitle": "Google",
+      "description": "Focus the Google search results window",
+      "timeoutMs": 10000,
+      "delayAfterMs": 1000
+    }
+  ]
+}

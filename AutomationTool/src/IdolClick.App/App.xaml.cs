@@ -35,6 +35,10 @@ public partial class App : Application
     public static IAutomationBackend DesktopBackend { get; private set; } = null!;
     public static ReportService Reports { get; private set; } = null!;
     public static VisionService Vision { get; private set; } = null!;
+    public static SnapCaptureService SnapCapture { get; private set; } = null!;
+    public static CaptureAnnotationService CaptureAnnotations { get; private set; } = null!;
+    public static CaptureSyncService CaptureSync { get; private set; } = null!;
+    public static ReviewBufferService ReviewBuffer { get; private set; } = null!;
     public static PackOrchestrator PackOrchestrator { get; private set; } = null!;
     public static TemplateRegistry Templates { get; private set; } = null!;
     public static IntentSplitterService IntentSplitter { get; private set; } = null!;
@@ -81,6 +85,15 @@ public partial class App : Application
     {
         // ── CLI arg handling ─────────────────────────────────────────────────
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        try
+        {
+            var tracePath = Path.Combine(AppContext.BaseDirectory, "logs", "startup_args_trace.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(tracePath)!);
+            File.AppendAllText(tracePath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {string.Join(" | ", args)}{Environment.NewLine}");
+        }
+        catch
+        {
+        }
         if (args.Length > 0)
         {
             switch (args[0].ToLowerInvariant())
@@ -108,6 +121,18 @@ public partial class App : Application
                 case "--demo":
                     RunDemo();
                     return;
+                case "--capture-harness":
+                    RunCaptureHarness(args.Skip(1).ToArray());
+                    return;
+                case "--capture-pack":
+                    RunCapturePack(args.Skip(1).ToArray());
+                    return;
+                case "--prompt-run":
+                    RunPromptAutomation(args.Skip(1).ToArray());
+                    return;
+                case "--prompt-pack-run":
+                    RunPromptCapturePack(args.Skip(1).ToArray());
+                    return;
             }
         }
 
@@ -130,17 +155,9 @@ public partial class App : Application
         // ── Phase 1: Core services (instant — Config + Log only) ─────────
         InitCoreServices();
 
-        // ── Phase 2: Route to Home screen or direct launch ───────────────
-        var settings = Config.GetConfig().Settings;
-        if (settings.SkipHomeScreen)
-        {
-            LaunchMode(settings.Mode);
-        }
-        else
-        {
-            _homeWindow = new HomeWindow();
-            _homeWindow.Show();
-        }
+        // ── Phase 2: Route to the welcome launcher ──────────────────────
+        _homeWindow = new HomeWindow();
+        _homeWindow.Show();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -233,6 +250,20 @@ public partial class App : Application
         UpdateSplash("Starting event timeline...", 0.50);
         Timeline = new EventTimelineService(Log);
 
+        UpdateSplash("Preparing capture services...", 0.55);
+        RegionCapture = new RegionCaptureService(Log);
+        Reports = new ReportService(Log);
+        SnapCapture = new SnapCaptureService(Config, Log, Reports);
+        Voice = new VoiceInputService(Config, Log);
+        CaptureAnnotations = new CaptureAnnotationService(Config, Log, Reports, SnapCapture, Voice);
+        CaptureSync = new CaptureSyncService(Config, Log, Reports, SnapCapture, CaptureAnnotations);
+        ReviewBuffer = new ReviewBufferService(Config, Log, Reports);
+        ReviewBuffer.Start();
+        if (Voice.IsConfigured)
+            Log.Info("App", "Voice input enabled (Azure Whisper)");
+        else
+            Log.Debug("App", "Voice input not configured — voice annotations disabled");
+
         // ── Agent / Teach: heavy services ────────────────────────────────
         if (mode is AppMode.Agent or AppMode.Teach)
         {
@@ -265,9 +296,6 @@ public partial class App : Application
     /// </summary>
     private async Task InitAgentServicesAsync()
     {
-        UpdateSplash("Initializing region capture...", 0.55);
-        RegionCapture = new RegionCaptureService(Log);
-
         UpdateSplash("Initializing agent service...", 0.60);
         Agent = new AgentService(Config, Log);
 
@@ -289,8 +317,6 @@ public partial class App : Application
         desktopBackend.SetTiming(timing);
         DesktopBackend = desktopBackend;
         FlowExecutor = new StepExecutor(Log, flowValidator, DesktopBackend);
-
-        Reports = new ReportService(Log);
 
         // ── Pack Orchestrator (Hand-Eye-Brain pipeline) ──────────────
         UpdateSplash("Initializing Pack orchestrator...", 0.75);
@@ -317,14 +343,6 @@ public partial class App : Application
         Log.Info("App", $"Template registry loaded: {Templates.Count} templates (" +
             $"{Templates.GetByMaturity(TemplateMaturity.Core).Count} core, " +
             $"{Templates.GetByMaturity(TemplateMaturity.Experimental).Count} experimental)");
-
-        // ── Voice Input (Azure Whisper push-to-talk) ─────────────────
-        UpdateSplash("Initializing voice input...", 0.85);
-        Voice = new VoiceInputService(Config, Log);
-        if (Voice.IsConfigured)
-            Log.Info("App", "Voice input enabled (Azure Whisper)");
-        else
-            Log.Debug("App", "Voice input not configured — mic button hidden");
 
         // ── API Host (Kestrel + SignalR) ─────────────────────────────
         UpdateSplash("Starting API host...", 0.90);
@@ -450,6 +468,7 @@ public partial class App : Application
     /// Usage:
     ///   --smoke                              Run all built-in tests
     ///   --smoke ST-01,ST-15                  Run specific test IDs
+    /// </summary>
     /// <summary>
     /// Starts IdolClick as an MCP server on stdio transport (no WPF, no UI).
     /// Used by IDEs and coding agents to interact with IdolClick via the Model Context Protocol.
@@ -661,6 +680,362 @@ public partial class App : Application
         }
     }
 
+    private void RunCaptureHarness(string[] harnessArgs)
+    {
+        string? logPath = null;
+        for (int i = 0; i < harnessArgs.Length; i++)
+        {
+            if (harnessArgs[i].Equals("--log", StringComparison.OrdinalIgnoreCase) && i + 1 < harnessArgs.Length)
+                logPath = harnessArgs[++i];
+        }
+
+        logPath ??= Path.Combine(AppContext.BaseDirectory, "logs",
+            $"capture_harness_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+
+        Console.WriteLine($"IdolClick Capture Harness v{ServiceHost.Version}");
+        Console.WriteLine($"Log file: {logPath}");
+
+        var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+        var appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
+        var configPath = Path.Combine(appDir, "config.json");
+
+        ServiceHost? host = null;
+        CaptureAnnotationService? captureAnnotations = null;
+        ReviewBufferService? reviewBuffer = null;
+        int exitCode = 1;
+
+        try
+        {
+            host = ServiceHost.Create(configPath);
+
+            Config = host.Config;
+            Log = host.Log;
+            Reports = host.Reports;
+            Vision = host.Vision;
+
+            SnapCapture = new SnapCaptureService(host.Config, host.Log, host.Reports);
+            CaptureAnnotations = captureAnnotations = new CaptureAnnotationService(host.Config, host.Log, host.Reports, SnapCapture, voice: null);
+            ReviewBuffer = reviewBuffer = new ReviewBufferService(host.Config, host.Log, host.Reports);
+
+            var actionExecutor = new ActionExecutor(host.Log);
+            actionExecutor.SetTiming(host.Config.GetConfig().Timing);
+            var flowActionExecutor = new FlowActionExecutor(host.Log, actionExecutor);
+            flowActionExecutor.SetTiming(host.Config.GetConfig().Timing);
+
+            var harness = new CaptureHarnessService(
+                host.Config,
+                host.Log,
+                host.Reports,
+                SnapCapture,
+                CaptureAnnotations,
+                ReviewBuffer,
+                flowActionExecutor);
+            harness.SetLogFile(logPath);
+            harness.OnLogMessage += message => Console.WriteLine(message);
+
+            var result = harness.RunCalculatorHarnessAsync(CancellationToken.None).GetAwaiter().GetResult();
+            harness.CloseLogFile();
+
+            Console.WriteLine();
+            Console.WriteLine($"Harness result: {(result.Succeeded ? "PASS" : "FAIL")}");
+            Console.WriteLine($"Report: {result.ReportPath}");
+            Console.WriteLine($"Output: {result.OutputDirectory}");
+            exitCode = result.Succeeded ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"FATAL: {ex.Message}");
+            Console.Error.WriteLine(ex.StackTrace);
+        }
+        finally
+        {
+            captureAnnotations?.Dispose();
+            reviewBuffer?.Dispose();
+            host?.Dispose();
+            Shutdown(exitCode);
+        }
+    }
+
+    private void RunCapturePack(string[] packArgs)
+    {
+        string? filePath = null;
+        string? logPath = null;
+        var smokeMode = true;
+        var inputs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < packArgs.Length; i++)
+        {
+            if (packArgs[i].Equals("--file", StringComparison.OrdinalIgnoreCase) && i + 1 < packArgs.Length)
+                filePath = packArgs[++i];
+            else if (packArgs[i].Equals("--log", StringComparison.OrdinalIgnoreCase) && i + 1 < packArgs.Length)
+                logPath = packArgs[++i];
+            else if (packArgs[i].Equals("--set", StringComparison.OrdinalIgnoreCase) && i + 1 < packArgs.Length)
+            {
+                var pair = packArgs[++i];
+                var separatorIndex = pair.IndexOf('=');
+                if (separatorIndex <= 0 || separatorIndex == pair.Length - 1)
+                {
+                    Console.Error.WriteLine($"ERROR: Invalid --set value '{pair}'. Use --set key=value.");
+                    Shutdown(2);
+                    return;
+                }
+
+                inputs[pair[..separatorIndex]] = pair[(separatorIndex + 1)..];
+            }
+            else if (packArgs[i].Equals("--full", StringComparison.OrdinalIgnoreCase))
+                smokeMode = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            Console.Error.WriteLine("ERROR: --capture-pack requires --file <pack.json>");
+            Shutdown(2);
+            return;
+        }
+
+        logPath ??= Path.Combine(AppContext.BaseDirectory, "logs", $"capture_pack_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+        var logDirectory = Path.GetDirectoryName(logPath);
+        if (!string.IsNullOrWhiteSpace(logDirectory))
+            Directory.CreateDirectory(logDirectory);
+
+        void WriteStartupLog(string message)
+        {
+            try
+            {
+                File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+            }
+            catch
+            {
+            }
+        }
+
+        WriteStartupLog($"Starting capture pack run file='{filePath}' smokeMode={smokeMode}");
+        Console.WriteLine($"IdolClick Capture Pack Runner v{ServiceHost.Version}");
+        Console.WriteLine($"Log file: {logPath}");
+
+        var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+        var appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
+        var configPath = Path.Combine(appDir, "config.json");
+
+        ServiceHost? host = null;
+        CaptureAnnotationService? captureAnnotations = null;
+        int exitCode = 1;
+
+        try
+        {
+            WriteStartupLog("Creating ServiceHost");
+            host = ServiceHost.CreateCaptureOnly(configPath);
+
+            Config = host.Config;
+            Log = host.Log;
+            Reports = host.Reports;
+            Vision = host.Vision;
+            FlowExecutor = host.FlowExecutor;
+
+            WriteStartupLog("Creating capture services");
+            SnapCapture = new SnapCaptureService(host.Config, host.Log, host.Reports);
+            CaptureAnnotations = captureAnnotations = new CaptureAnnotationService(host.Config, host.Log, host.Reports, SnapCapture, voice: null);
+
+            WriteStartupLog("Running capture pack service");
+            var runner = new CaptureProfilePackRunnerService(host.Config, host.Log, host.Reports, SnapCapture, CaptureAnnotations, host.SelectorParser, host.FlowExecutor);
+            runner.SetLogFile(logPath);
+            WriteStartupLog("Capture pack runner log file attached");
+            runner.OnLogMessage += message => Console.WriteLine(message);
+            var runResult = runner.RunAsync(filePath, smokeMode, inputs, CancellationToken.None).GetAwaiter().GetResult();
+            WriteStartupLog($"Capture pack runner completed success={runResult.Succeeded} report={runResult.ReportPath}");
+            runner.CloseLogFile();
+
+            Console.WriteLine();
+            Console.WriteLine($"Pack result: {(runResult.Succeeded ? "PASS" : "FAIL")}");
+            Console.WriteLine($"Report: {runResult.ReportPath}");
+            exitCode = runResult.Succeeded ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            WriteStartupLog($"FATAL: {ex}");
+            Console.Error.WriteLine($"FATAL: {ex.Message}");
+            Console.Error.WriteLine(ex.StackTrace);
+        }
+        finally
+        {
+            captureAnnotations?.Dispose();
+            host?.Dispose();
+            Shutdown(exitCode);
+        }
+    }
+
+    private void RunPromptAutomation(string[] promptArgs)
+    {
+        var inputParts = new List<string>();
+        var autoConfirm = false;
+
+        for (int i = 0; i < promptArgs.Length; i++)
+        {
+            if (promptArgs[i].Equals("--input", StringComparison.OrdinalIgnoreCase))
+            {
+                while (i + 1 < promptArgs.Length && !promptArgs[i + 1].StartsWith("--", StringComparison.OrdinalIgnoreCase))
+                    inputParts.Add(promptArgs[++i]);
+            }
+            else if (promptArgs[i].Equals("--yes", StringComparison.OrdinalIgnoreCase)
+                || promptArgs[i].Equals("--confirm", StringComparison.OrdinalIgnoreCase))
+                autoConfirm = true;
+            else if (!promptArgs[i].StartsWith("--") && inputParts.Count == 0)
+                inputParts.Add(promptArgs[i]);
+        }
+
+        var input = string.Join(" ", inputParts).Trim();
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Console.Error.WriteLine("ERROR: --prompt-run requires --input \"<user instruction>\"");
+            Shutdown(2);
+            return;
+        }
+
+        Console.WriteLine($"IdolClick Prompt Automation v{ServiceHost.Version}");
+        Console.WriteLine($"Input: {input}");
+
+        var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+        var appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
+        var configPath = Path.Combine(appDir, "config.json");
+
+        ServiceHost? host = null;
+        int exitCode = 1;
+
+        try
+        {
+            host = ServiceHost.CreateCaptureOnly(configPath);
+
+            Config = host.Config;
+            Log = host.Log;
+            Reports = host.Reports;
+            Vision = host.Vision;
+            FlowExecutor = host.FlowExecutor;
+            Templates = TemplateRegistry.CreateDefault();
+            IntentSplitter = new IntentSplitterService(Templates, Log);
+
+            var orchestrator = new PromptFlowOrchestratorService(IntentSplitter, FlowExecutor, Reports, Log);
+            var result = orchestrator.RunAsync(input, new IdolClick.Services.ExecutionContext(), autoConfirm, CancellationToken.None)
+                .GetAwaiter().GetResult();
+
+            Console.WriteLine($"Tier: {result.Tier}");
+            Console.WriteLine($"Template: {result.TemplateId}");
+            Console.WriteLine($"Executed: {result.Executed}");
+
+            if (!string.IsNullOrWhiteSpace(result.Error))
+                Console.WriteLine($"Message: {result.Error}");
+            else if (!string.IsNullOrWhiteSpace(result.Reason))
+                Console.WriteLine($"Message: {result.Reason}");
+
+            if (!string.IsNullOrWhiteSpace(result.ReportPath))
+                Console.WriteLine($"Report: {result.ReportPath}");
+
+            exitCode = result.Executed && result.Succeeded ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"FATAL: {ex.Message}");
+            Console.Error.WriteLine(ex.StackTrace);
+        }
+        finally
+        {
+            host?.Dispose();
+            Shutdown(exitCode);
+        }
+    }
+
+    private void RunPromptCapturePack(string[] promptArgs)
+    {
+        var inputParts = new List<string>();
+        var autoConfirm = false;
+        var smokeMode = true;
+
+        for (int i = 0; i < promptArgs.Length; i++)
+        {
+            if (promptArgs[i].Equals("--input", StringComparison.OrdinalIgnoreCase))
+            {
+                while (i + 1 < promptArgs.Length && !promptArgs[i + 1].StartsWith("--", StringComparison.OrdinalIgnoreCase))
+                    inputParts.Add(promptArgs[++i]);
+            }
+            else if (promptArgs[i].Equals("--yes", StringComparison.OrdinalIgnoreCase)
+                || promptArgs[i].Equals("--confirm", StringComparison.OrdinalIgnoreCase))
+            {
+                autoConfirm = true;
+            }
+            else if (promptArgs[i].Equals("--full", StringComparison.OrdinalIgnoreCase))
+            {
+                smokeMode = false;
+            }
+            else if (!promptArgs[i].StartsWith("--") && inputParts.Count == 0)
+            {
+                inputParts.Add(promptArgs[i]);
+            }
+        }
+
+        var input = string.Join(" ", inputParts).Trim();
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Console.Error.WriteLine("ERROR: --prompt-pack-run requires --input \"<capture pack instruction>\"");
+            Shutdown(2);
+            return;
+        }
+
+        Console.WriteLine($"IdolClick Prompt Capture Pack v{ServiceHost.Version}");
+        Console.WriteLine($"Input: {input}");
+
+        var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+        var appDir = Path.GetDirectoryName(exePath) ?? AppContext.BaseDirectory;
+        var configPath = Path.Combine(appDir, "config.json");
+
+        ServiceHost? host = null;
+        CaptureAnnotationService? captureAnnotations = null;
+        int exitCode = 1;
+
+        try
+        {
+            host = ServiceHost.CreateCaptureOnly(configPath);
+
+            Config = host.Config;
+            Log = host.Log;
+            Reports = host.Reports;
+            Vision = host.Vision;
+            FlowExecutor = host.FlowExecutor;
+            SnapCapture = new SnapCaptureService(host.Config, host.Log, host.Reports);
+            CaptureAnnotations = captureAnnotations = new CaptureAnnotationService(host.Config, host.Log, host.Reports, SnapCapture, voice: null);
+
+            var orchestrator = new PromptCapturePackOrchestratorService(host.Config, host.Log, host.Reports, SnapCapture, CaptureAnnotations, host.FlowExecutor);
+            var result = orchestrator.RunAsync(input, autoConfirm, smokeMode, CancellationToken.None).GetAwaiter().GetResult();
+
+            Console.WriteLine($"Pack: {result.PackName} ({result.PackId})");
+            Console.WriteLine($"Executed: {result.Executed}");
+            Console.WriteLine($"Succeeded: {result.Succeeded}");
+
+            if (result.ResolvedInputs.Count > 0)
+                Console.WriteLine($"Inputs: {string.Join(", ", result.ResolvedInputs.Select(pair => $"{pair.Key}={pair.Value}"))}");
+
+            if (!string.IsNullOrWhiteSpace(result.Error))
+                Console.WriteLine($"Message: {result.Error}");
+            else if (!string.IsNullOrWhiteSpace(result.Reason))
+                Console.WriteLine($"Message: {result.Reason}");
+
+            if (!string.IsNullOrWhiteSpace(result.ReportPath))
+                Console.WriteLine($"Report: {result.ReportPath}");
+
+            exitCode = result.Executed && result.Succeeded ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"FATAL: {ex.Message}");
+            Console.Error.WriteLine(ex.StackTrace);
+        }
+        finally
+        {
+            captureAnnotations?.Dispose();
+            host?.Dispose();
+            Shutdown(exitCode);
+        }
+    }
+
     /// <summary>
     /// Signal the existing instance to show its window.
     /// </summary>
@@ -786,6 +1161,10 @@ public partial class App : Application
         try { Timeline?.Dispose(); }            catch { /* best-effort */ }
         try { Hotkey?.Dispose(); }              catch { /* best-effort */ }
         try { Engine?.Dispose(); }              catch { /* best-effort */ }
+        try { ReviewBuffer?.Dispose(); }        catch { /* best-effort */ }
+        try { CaptureSync?.Dispose(); }         catch { /* best-effort */ }
+        try { CaptureAnnotations?.Dispose(); }  catch { /* best-effort */ }
+        try { SnapCapture?.Dispose(); }         catch { /* best-effort */ }
         try { (Log as IDisposable)?.Dispose(); } catch { /* flush log */ }
         
         // ALWAYS release the single-instance mutex so the next launch succeeds.

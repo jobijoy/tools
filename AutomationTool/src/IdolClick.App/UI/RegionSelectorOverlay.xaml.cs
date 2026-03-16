@@ -11,6 +11,8 @@ namespace IdolClick.UI;
 /// </summary>
 public partial class RegionSelectorOverlay : Window
 {
+    private SolidColorBrush? _validSelectionBrush;
+    private SolidColorBrush? _invalidSelectionBrush;
     private Point _startPoint;
     private bool _isSelecting;
     private bool _hasSelection;
@@ -25,6 +27,9 @@ public partial class RegionSelectorOverlay : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _validSelectionBrush ??= (SolidColorBrush)FindResource("SelectionStrokeBrush");
+        _invalidSelectionBrush ??= (SolidColorBrush)FindResource("SelectionInvalidBrush");
+
         // Ensure full virtual screen coverage (multi-monitor support)
         Left = SystemParameters.VirtualScreenLeft;
         Top = SystemParameters.VirtualScreenTop;
@@ -73,7 +78,8 @@ public partial class RegionSelectorOverlay : Window
     private void Window_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         var currentPos = e.GetPosition(this);
-        CoordinatesText.Text = $"Position: ({(int)currentPos.X}, {(int)currentPos.Y})";
+        var screenPoint = ToScreenPixels(currentPos);
+        CoordinatesText.Text = $"Position: ({screenPoint.X}, {screenPoint.Y})";
 
         if (!_isSelecting) return;
 
@@ -102,9 +108,7 @@ public partial class RegionSelectorOverlay : Window
         _hasSelection = width > 5 && height > 5;
 
         // Update selection color based on validity
-        SelectionRect.Stroke = _hasSelection 
-            ? new SolidColorBrush(Color.FromRgb(0, 170, 255)) 
-            : new SolidColorBrush(Color.FromRgb(255, 100, 100));
+        SelectionRect.Stroke = _hasSelection ? _validSelectionBrush : _invalidSelectionBrush;
     }
 
     private void Window_MouseUp(object sender, MouseButtonEventArgs e)
@@ -117,10 +121,12 @@ public partial class RegionSelectorOverlay : Window
         if (_hasSelection)
         {
             var currentPos = e.GetPosition(this);
-            var x = (int)Math.Min(currentPos.X, _startPoint.X);
-            var y = (int)Math.Min(currentPos.Y, _startPoint.Y);
-            var width = (int)Math.Abs(currentPos.X - _startPoint.X);
-            var height = (int)Math.Abs(currentPos.Y - _startPoint.Y);
+            var startScreenPoint = ToScreenPixels(_startPoint);
+            var endScreenPoint = ToScreenPixels(currentPos);
+            var x = Math.Min(startScreenPoint.X, endScreenPoint.X);
+            var y = Math.Min(startScreenPoint.Y, endScreenPoint.Y);
+            var width = Math.Abs(endScreenPoint.X - startScreenPoint.X);
+            var height = Math.Abs(endScreenPoint.Y - startScreenPoint.Y);
 
             SelectedRegion = new CapturedRegion
             {
@@ -134,5 +140,13 @@ public partial class RegionSelectorOverlay : Window
             DialogResult = true;
             Close();
         }
+    }
+
+    private System.Drawing.Point ToScreenPixels(Point localPoint)
+    {
+        var screenPoint = PointToScreen(localPoint);
+        return new System.Drawing.Point(
+            (int)Math.Round(screenPoint.X),
+            (int)Math.Round(screenPoint.Y));
     }
 }

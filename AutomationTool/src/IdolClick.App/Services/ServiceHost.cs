@@ -38,6 +38,7 @@ public class ServiceHost : IDisposable
     public LogService Log { get; }
     public ProfileService Profiles { get; }
     public FlowValidatorService FlowValidator { get; }
+    public SelectorParser SelectorParser { get; }
     public StepExecutor FlowExecutor { get; }
     public IAutomationBackend Backend { get; }
     public IAgentService Agent { get; }
@@ -52,6 +53,7 @@ public class ServiceHost : IDisposable
         LogService log,
         ProfileService profiles,
         FlowValidatorService flowValidator,
+        SelectorParser selectorParser,
         StepExecutor flowExecutor,
         IAutomationBackend backend,
         IAgentService agent,
@@ -65,6 +67,7 @@ public class ServiceHost : IDisposable
         Log = log;
         Profiles = profiles;
         FlowValidator = flowValidator;
+        SelectorParser = selectorParser;
         FlowExecutor = flowExecutor;
         Backend = backend;
         Agent = agent;
@@ -122,7 +125,44 @@ public class ServiceHost : IDisposable
         log.Info("ServiceHost", "Core services initialized (WPF-free)");
 
         return new ServiceHost(
-            config, log, profiles, flowValidator, flowExecutor,
+            config, log, profiles, flowValidator, selectorParser, flowExecutor,
+            backend, agent, reports, vision, plugins, timeline, scripts);
+    }
+
+    public static ServiceHost CreateCaptureOnly(string configPath)
+    {
+        var config = new ConfigService(configPath);
+        var log = new LogService();
+        log.SetLevel(config.GetConfig().Settings.LogLevel);
+
+        var profiles = new ProfileService(config, log);
+        var scripts = new ScriptExecutionService(log, config);
+        var plugins = new PluginService(log);
+        var timeline = new EventTimelineService(log);
+        var vision = new VisionService(config, log);
+
+        var flowValidator = new FlowValidatorService(log);
+        var timing = config.GetConfig().Timing;
+        var ruleExecutor = new ActionExecutor(log);
+        ruleExecutor.SetTiming(timing);
+        var flowActionExecutor = new FlowActionExecutor(log, ruleExecutor);
+        flowActionExecutor.SetTiming(timing);
+        var assertionEvaluator = new AssertionEvaluator(log);
+        var selectorParser = new SelectorParser(log);
+        selectorParser.SetCacheTtl(timing.SelectorCacheTtlMs);
+        selectorParser.SetTiming(timing);
+
+        var backend = new DesktopBackend(log, flowActionExecutor, assertionEvaluator, selectorParser, vision);
+        backend.SetTiming(timing);
+        var flowExecutor = new StepExecutor(log, flowValidator, backend);
+
+        var reports = new ReportService(log);
+        var agent = new NullAgentService();
+
+        log.Info("ServiceHost", "Capture-only services initialized");
+
+        return new ServiceHost(
+            config, log, profiles, flowValidator, selectorParser, flowExecutor,
             backend, agent, reports, vision, plugins, timeline, scripts);
     }
 
@@ -160,6 +200,12 @@ public class ServiceHost : IDisposable
         Console.WriteLine("  IdolClick.exe --smoke --log <path>        Write incremental log to a custom file path");
         Console.WriteLine("  IdolClick.exe --smoke --file suite.json --log C:\\out\\result.txt");
         Console.WriteLine("  IdolClick.exe --smoke --file suite.json ST-01,ST-03   Run only matched IDs from file");
+        Console.WriteLine("  IdolClick.exe --capture-harness          Run the headless Calculator capture harness");
+        Console.WriteLine("  IdolClick.exe --capture-harness --log <path>  Write harness progress to a custom log file");
+        Console.WriteLine("  IdolClick.exe --capture-pack --file <pack.json>   Run a capture profile pack smoke test");
+        Console.WriteLine("  IdolClick.exe --capture-pack --file <pack.json> --full   Run the full observation duration from the pack");
+        Console.WriteLine("  IdolClick.exe --prompt-run --input \"search for weather in london\" --yes   Resolve a prompt to a flow and execute it");
+        Console.WriteLine("  IdolClick.exe --prompt-pack-run --input \"monitor google search for windows ui automation\" --yes   Resolve a prompt to a canonical capture pack and execute it");
         Console.WriteLine();
         Console.WriteLine("  External test files use the smoke-test.schema.json format.");
         Console.WriteLine("  Each test can define multi-step sequential prompts with screenshots.");
